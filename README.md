@@ -1,146 +1,201 @@
-Orbital Mechanics Simulator
+# Orbital Mechanics Simulator
 
-A browser-based 2D orbital simulation using Newtonian gravity.
-The system models Earth, the Moon, and a satellite with real orbital mechanics, a fully dynamic camera, and UI panels for simulation time, orbital parameters, and settings.
+A browser-based 2D orbital simulation using Newtonian gravity.  
+The system models Earth, the Moon, and a satellite with real orbital mechanics, a dynamic camera, and UI panels displaying simulation time, orbital parameters, and settings.
 
-Visual assets for Earth and Moon are sourced from:
+---
 
-PixelPlanets
-https://github.com/Deep-Fold/PixelPlanets
+## Visual Assets
 
-The simulation is implemented in vanilla JavaScript and rendered using HTML5 Canvas.
+Earth and Moon artwork sourced from:
 
-Features
-Real Newtonian Gravity
+PixelPlanets — https://github.com/Deep-Fold/PixelPlanets  
+(Refer to their repository for licensing information)
 
-All bodies interact gravitationally using the universal gravitational constant.
-Physics integration is implemented in rigidBody.js, including:
+---
 
-Force accumulation
+## Technology
 
-Velocity and position updates
+Built using:
 
-Orbital element calculation (semi-major axis, eccentricity, periapsis, apoapsis, orbital period)
+- Vanilla JavaScript
+- HTML5 Canvas
 
-Earth–Moon System
+All physics are implemented manually without external simulation libraries.
 
-Defined in index.js using real-world scaled values.
-The Moon computes and draws its orbital path dynamically (moon.js).
+---
 
-Satellite
+## Features
 
-A fully simulated satellite orbiting Earth.
-Uses the same gravitational physics and orbit-element math (satellite.js).
-Selectable by mouse.
+### Real Newtonian Gravity
 
-Camera System
+All bodies interact gravitationally using the universal gravitational constant.  
+Physics integration is implemented in `rigidBody.js`, including:
 
-Camera logic (panning, zooming, target locking) is handled in geometry.js.
-The camera can track a selected body by matching its velocity, keeping it centered.
+- Force accumulation
+- Velocity and position updates
+- Orbital parameter calculations:
+  - Semi-major axis
+  - Eccentricity
+  - Periapsis and apoapsis
+  - Orbital period
 
-UI Panels
+---
 
-UI is managed by UI.js and includes:
+### Earth–Moon System
 
-Time Panel
+Defined in `index.js` using scaled real-world values.  
+The Moon dynamically computes its orbital elements and draws its orbit path, implemented in `moon.js`.
 
-Simulation clock (years/days/hours/minutes/seconds)
+---
 
-Time warp controls (1× to 10,000×)
+### Satellite
 
-Smooth UI expansion on hover
+A fully simulated satellite orbiting Earth, using the same gravitational physics and orbital calculations.  
+Selectable via mouse input.  
+Defined in `satellite.js`.
 
-Orbit Information Panel
+---
 
-Shows for the selected body:
+### Camera System
 
-Speed
+Implemented in `geometry.js` and supports:
 
-Altitude
+- Panning
+- Zooming
+- Target tracking
 
-Apoapsis
+The camera can lock onto a body and follow its motion to keep it centered.
 
-Periapsis
+---
 
-Semi-major axis
+## UI Panels (UI.js)
 
-Eccentricity
+The interface includes multiple panels:
 
-Orbital period
+---
 
-Body Information Panel
+### Time Panel
 
-Selected body
+- Displays simulation clock (years, days, hours, minutes, seconds)
+- Time warp controls (1× to 10,000×)
+- Smooth expansion on hover
 
-Locked camera target
+---
 
-Parent body
+### Orbit Information Panel
 
-Object mass
+Shows live orbital data for the selected body:
 
-General Settings
+- Speed
+- Altitude
+- Apoapsis
+- Periapsis
+- Semi-major axis
+- Eccentricity
+- Orbital period
 
-Toggle orbit path visibility
+---
 
-True-size body rendering toggle
+### Body Information Panel
 
-Display of km-per-pixel scale
+Displays:
 
-Controls
+- Selected body
+- Locked camera target
+- Parent body
+- Object mass
 
-Below is the complete list of all key and mouse controls currently implemented in the code.
+---
 
-Mouse Controls
-Action	Input
-Select body	Left click
-Open context menu (select/camera-target)	Right click
-Pan camera	Left-click drag
-Zoom	Mouse wheel
-Camera Controls
-Action	Input
-Zoom in	Arrow Up
-Zoom out	Arrow Down
-Reset camera target to selected body	C
-Time Warp Controls
+### General Settings
 
-These are defined in the UI and controlled by clicking, but also include internal input handling:
+Includes options to:
 
-Action	Input
-Reset to 1× speed	C (also resets camera target)
+- Toggle orbit path visibility
+- Toggle true-size rendering
+- Display km-per-pixel scale
 
-(Time warp values themselves are selected via UI buttons, not keys.)
+---
 
-UI Toggles
-Action	Input
-Toggle orbit path display	Checkbox in Settings panel
-Toggle true-size rendering	Checkbox in Settings panel
-Context Menu Options
+## Controls
 
-Accessible via right-click on a body:
+### Mouse Input
 
-Select Body
+| Action | Input |
+|--------|-------|
+| Select body | Left click |
+| Open context menu (selection or camera target) | Right click |
+| Pan camera | Left-click + drag |
+| Zoom | Mouse wheel |
 
-Set Camera Target
+---
 
-These options dynamically update information panels and the camera lock.
+### Keyboard — Camera
 
-Project Structure
-index.html        – Layout and container for canvas and UI panels
-style.css         – Styling for UI components and simulation window
-index.js          – Simulation setup, main loop, rendering, camera logic
-geometry.js       – Zoom/pan, canvas transforms, scaling utilities
-rigidBody.js      – Core N-body physics engine, orbital element math
-earth.js          – Earth definition and drawing
-moon.js           – Moon definition and orbit path drawing
-satellite.js      – Satellite definition and orbit path drawing
-UI.js             – Time panel, settings panel, orbit information, context menus
-input.js          – Reserved for future input handling
+| Action | Input |
+|--------|-------|
+| Zoom in | Arrow Up |
+| Zoom out | Arrow Down |
+| Rotate Left | A |
+| Rotate Right | D |
+| Throttle Up | Shift |
+| Throttle Down | Ctrl |
+| Increase Max Thrust | R |
+| Decrease Max Thrust | F |
 
-Assets
 
-Earth and Moon artwork originate from:
+---
 
-PixelPlanets
-https://github.com/Deep-Fold/PixelPlanets
+### Time Warp
 
-Please refer to that repository for licensing information.
+Time warp values are selected via UI buttons.
+
+Keyboard shortcut:
+
+- C resets simulation to 1×.
+
+---
+
+### UI Toggles
+
+Located in the Settings panel:
+
+- Orbit path display toggle
+
+---
+
+### Context Menu Options
+
+Accessible by right-clicking a body:
+
+- Select Body
+- Set Camera Target
+
+These update UI information and camera behavior dynamically.
+
+---
+
+## Project Structure
+
+index.html – Canvas and UI layout
+style.css – UI styling and layout
+index.js – Simulation setup, main loop, rendering
+geometry.js – Camera transforms, scaling utilities
+rigidBody.js – Core N-body physics engine and orbital math
+earth.js – Earth definition and drawing logic
+moon.js – Moon definition and orbit path rendering
+satellite.js – Satellite simulation and drawing
+UI.js – Time panel, settings, orbit information, menus
+input.js – Reserved for future input handling
+
+yaml
+Copy code
+
+---
+
+## Assets
+
+Earth and Moon pixel art provided by:
+
+PixelPlanets — https://github.com/Deep-Fold/PixelPlanets
