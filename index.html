@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Orbits</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+
+  <body>
+    <div class="canvas-wrapper">
+      <canvas id="game"></canvas>
+
+      <!-- TIME PANEL (Clock + Warp buttons) -->
+      <div id="timePanel" class="ui-panel timepanel">
+        <div class="timepanel-top">
+          <div id="simClock">
+            <div id="simClock" class="clock-bar">
+
+              <div class="clock-segment">
+                <div id="clockYears" class="clock-number">0</div>
+                <div class="clock-label">years</div>
+              </div>
+              <div class="clock-separator"></div>
+            
+              <div class="clock-segment">
+                <div id="clockDays" class="clock-number">0</div>
+                <div class="clock-label">days</div>
+              </div>
+              <div class="clock-separator"></div>
+            
+              <div class="clock-segment">
+                <div id="clockHours" class="clock-number">00</div>
+                <div class="clock-label">hours</div>
+              </div>
+              <div class="clock-separator"></div>
+            
+              <div class="clock-segment">
+                <div id="clockMinutes" class="clock-number">00</div>
+                <div class="clock-label">minutes</div>
+              </div>
+              <div class="clock-separator"></div>
+            
+              <div class="clock-segment">
+                <div id="clockSeconds" class="clock-number">00</div>
+                <div class="clock-label">seconds</div>
+              </div>
+            
+            </div>
+            
+          </div>
+        </div>
+
+        <div id="warpButtons" class="warp-buttons">
+          <div class="clock-separator"></div>
+          <button data-scale="1">1×</button>
+          <div class="clock-separator"></div>
+          <button data-scale="5">5×</button>
+          <div class="clock-separator"></div>
+          <button data-scale="10">10×</button>
+          <div class="clock-separator"></div>
+          <button data-scale="50">50×</button>
+          <div class="clock-separator"></div>
+          <button data-scale="100">100×</button>
+          <div class="clock-separator"></div>
+          <button data-scale="500">500×</button>
+          <div class="clock-separator"></div>
+          <button data-scale="1000">1k×</button>
+          <div class="clock-separator"></div>
+          <button data-scale="5000">5k×</button>
+          <div class="clock-separator"></div>
+          <button data-scale="10000">10k×</button>
+          <div class="clock-separator"></div>
+          <button data-scale="50000">50k×</button>
+        </div>
+      </div>
+
+      <!-- ORBIT INFO -->
+      <div id="orbitInfo" class="ui-panel large-panel">
+        <div class="ui-title">Orbit Information</div>
+        <div class="ui-divider"></div>
+        <div class="info-row"><span>Speed:</span><span id="speedValue">—</span></div>
+        <div class="info-row"><span>Altitude:</span><span id="altitudeValue">—</span></div>
+        <div class="info-row"><span>Apoapsis:</span><span id="apoapsisValue">—</span></div>
+        <div class="info-row"><span>Periapsis:</span><span id="periapsisValue">—</span></div>
+        <div class="info-row"><span>Semi-Major:</span><span id="semiMajorValue">—</span></div>
+        <div class="info-row"><span>Eccentricity:</span><span id="eccValue">—</span></div>
+        <div class="info-row"><span>Period:</span><span id="periodValue">—</span></div>
+      </div>
+
+      <!-- SETTINGS PANEL -->
+      <div id="generalSettings" class="ui-panel small-panel">
+        <div class="ui-title">Settings</div>
+        <div class="ui-divider"></div>
+
+
+        <div class="info-row">
+          <span>Show Path:</span>
+          <input id="showPath" type="checkbox" checked/>
+        </div>
+
+        <div class="info-row">
+          <span>Scale:</span>
+          <span id="scaleText">10 km / px</span>
+        </div>
+      </div>
+
+      <!-- BODY INFO -->
+      <div id="bodyInfo" class="ui-panel small-panel">
+        <div class="ui-title">Body Status</div>
+        <div class="ui-divider"></div>
+
+        <div class="info-row"><span>Selected:</span><span id="bodyName">Satellite</span></div>
+        <div class="info-row"><span>Mass:</span><span id="bodyMass">—</span></div>
+        <div class="info-row"><span>Locked On:</span><span id="CameraTarget">Earth</span></div>
+        <div class="info-row"><span>Orbiting:</span><span id="bodyParent">—</span></div>
+        
+      </div>
+
+    </div>
+        <!-- RIGHT-CLICK CONTEXT MENU -->
+    <div id="contextMenu" class="context-menu">
+      <div id="ctxSelect">Select Body</div>
+      <div id="ctxCamera">Set Camera Target</div>
+    </div>
+
+
+    <script type="module" src="index.js"></script>
+  </body>
+</html>
