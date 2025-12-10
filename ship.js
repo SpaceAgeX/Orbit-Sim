@@ -67,6 +67,13 @@ export class Ship extends RigidBody {
             if (Input.isDown("KeyD")) {
                 this.angle += 1.5 * dt; // rotate right
             }
+
+            if(Input.pressed("KeyR")) {
+                this.MaxThrustN = 100000;
+            }
+            if(Input.pressed("KeyT")) {
+                this.MaxThrustN = 10000;
+            }
         } else {
             this.thrustPercent = 0;
         }
