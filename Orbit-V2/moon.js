@@ -1,67 +1,73 @@
-// Ship.js
+// moon.js
 
 import { Body } from "./object.js";
 import { Vector2D, kmToPixels } from "./geometry.js";
+import { effectiveKmPerPixel } from "./geometry.js";
 
 
-const SHIP_MASS_KG = 1000;
-const SHIP_RADIUS_M = 100000; // 2 meters (reasonable ship size)
+const MOON_MASS_KG = 7.342e22;
+const MOON_RADIUS_M = 1737400; // real Moon radius
 
-export class Ship extends Body {
+export class Moon extends Body {
   constructor() {
     super({
-      name: "Ship",
-      position: new Vector2D(7000000, 0, true),   // meters
-      velocity: new Vector2D(0, -7545, true),  // m/s
-      mass: SHIP_MASS_KG,
-      radius: SHIP_RADIUS_M,                  // meters
+      name: "Moon",
+      position: new Vector2D(384400000, 0, true),   // meters from Earth
+      velocity: new Vector2D(0, -1022, true),        // m/s orbital velocity
+      mass: MOON_MASS_KG,
+      radius: MOON_RADIUS_M,
       sBody: false,
-      influential: false,
-      motionMode: "nbody"
+      influential: true,
+      motionMode: "kepler", // 🔒 always kepler
     });
-    this.localMode = "physics";
+
+    this.image = new Image();
+    this.image.src = "Public/Moon.png";
   }
 
-
-  update(dt, warpMode) {
-    const normalizedWarp = warpMode === "physics" || !warpMode ? "physics" : "fixed";
-
-    // Always update trajectory when in physics mode so it's ready for switching
-    if (this.motionMode === "nbody") {
-      this.computeTrajectory();
-    }
-
-    if (normalizedWarp !== this.localMode) {
-      this.switchState(normalizedWarp, dt);
-      this.localMode = normalizedWarp;
+  /**
+   * Moon ignores warp mode completely.
+   * It always stays on Kepler rails.
+   */
+  update(dt /* warpMode intentionally ignored */) {
+    if (this.motionMode !== "kepler") {
+      this.switchState("kepler");
     }
 
     super.update(dt);
   }
-  
 
   draw(ctx) {
-    
+    if (!this.image.complete) return;
+
     this.drawPath(ctx);
-    // meters → km → pixels
+    
     const xPx = kmToPixels(this.realPosition.x / 1000);
     const yPx = kmToPixels(this.realPosition.y / 1000);
-    const radiusPx = kmToPixels(this.realRadius / 1000);
+
+    // Scale visually so it's visible (not to real scale)
+    const visualRadiusKm = 2000; // tweak for appearance
+    const sizePx = kmToPixels(visualRadiusKm) * 2;
 
     ctx.save();
     ctx.translate(xPx, yPx);
 
-    ctx.beginPath();
-    ctx.arc(0, 0, radiusPx, 0, Math.PI * 2);
-    ctx.fillStyle = "white";
-    ctx.fill();
+    ctx.drawImage(
+      this.image,
+      -sizePx / 2,
+      -sizePx / 2,
+      sizePx,
+      sizePx
+    );
 
     ctx.restore();
-
-    
   }
 
+  /**
+   * Optional: draw orbital path (same as ship)
+   */
   drawPath(ctx) {
+    
     if (!this.trajectory || !this.parent) return;
 
     const {
@@ -119,11 +125,10 @@ export class Ship extends Body {
         }
     }
 
-    ctx.strokeStyle = "#167e9e";
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(220, 220, 220, 0.3)";
+    ctx.lineWidth = 10;
     ctx.stroke();
 
     ctx.restore();
-    }
-
+  }
 }

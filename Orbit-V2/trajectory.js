@@ -1,12 +1,23 @@
-// Trajectory.js
-// ======================================================
-// Two-body orbital trajectory (interpretation layer)
-// Real units ONLY: meters, m/s, kg, seconds
-// No forces, no rendering, no integration
-// ======================================================
+// trajectory.js
+// =====================================================
+// Keplerian trajectory (V2 - STATE SAFE)
+// Proper Kepler propagation (elliptic + hyperbolic)
+// Units: meters, seconds, radians
+// =====================================================
 
-import { gravitationalConstant } from "./rigidBody.js";
 import { Vector2D } from "./geometry.js";
+
+const G = 6.67408e-11;
+
+function clamp(x, lo, hi) {
+  return Math.max(lo, Math.min(hi, x));
+}
+
+function normalizeAngle(a) {
+  const t = 2 * Math.PI;
+  a = a % t;
+  return a < 0 ? a + t : a;
+}
 
 export class Trajectory {
   constructor(body, parent) {
@@ -15,301 +26,274 @@ export class Trajectory {
 
     this.valid = false;
 
-    // --- future rendezvous / targeting (NOT computed yet)
-    this.target = null;
-    this.targetRelativeVelocity = null;
-    this.targetSeparation = null;
-    this.closestApproach = null;
-    this.timeToClosestApproach = null;
+    // Elements
+    this.mu = 0;
+    this.h = 0;
 
-    this.refresh();
+    this.e = 0;
+    this.eVec = new Vector2D(0, 0, true);
+
+    this.a = 0;
+    this.p = 0;
+
+    this.omega = 0;
+
+    // Epoch anomalies
+    this.M0 = 0;   // mean anomaly at epoch (elliptic) OR mean hyperbolic anomaly (hyperbolic)
+    this.n = 0;    // mean motion (elliptic/hyperbolic)
+
+    if (!body || !parent) return;
+    this._computeElements();
   }
 
-  // --------------------------------------------------
-  // Recompute trajectory from current state vectors
-  // --------------------------------------------------
-  refresh() {
-    if (!this.body || !this.parent) {
-      this.valid = false;
-      return null;
+  _computeElements() {
+    const rVec = this.body.realPosition.sub(this.parent.realPosition);
+    const vVec = this.body.realVelocity.sub(this.parent.realVelocity);
+
+    const r = rVec.r;
+    const v = vVec.r;
+    if (r === 0) return;
+
+    const mu = G * this.parent.mass;
+
+    // specific angular momentum (scalar in 2D)
+    const h = rVec.cross(vVec);
+    const dir = Math.sign(h) || 1; // sign encodes prograde (CCW) vs retrograde (CW)
+
+    // eccentricity vector
+    // eVec = [ (v^2 - mu/r) rVec - (r·v) vVec ] / mu
+    const rv = rVec.dot(vVec);
+    const eVec = rVec.mul(v * v - mu / r).sub(vVec.mul(rv)).div(mu);
+    const e = eVec.r;
+
+    // semi-major axis
+    const a = 1 / (2 / r - (v * v) / mu);
+
+    // semi-latus rectum
+    const p = (h * h) / mu;
+
+    // argument of periapsis (2D: angle of eVec)
+    const omega = e > 1e-12 ? eVec.angle : 0;
+
+    // true anomaly at epoch (angle from periapsis to r)
+    // nu0 = atan2( r x e, r · e )
+    const nu0 = -Math.atan2(rVec.cross(eVec), rVec.dot(eVec));
+
+    this.mu = mu;
+    this.h = h;
+    this.dir = dir;
+    this.e = e;
+    this.eVec = eVec;
+    this.a = a;
+    this.p = p;
+    this.omega = omega;
+
+    // Mean motion & epoch mean anomaly (elliptic/hyperbolic)
+    if (e < 1) {
+      // Elliptic
+      // carry direction into mean motion so retrograde stays retrograde
+      this.n = dir * Math.sqrt(mu / Math.abs(a ** 3));
+
+      // Convert nu0 -> E0
+      const cosNu = Math.cos(nu0);
+      const sinNu = Math.sin(nu0);
+
+      const sqrt1me2 = Math.sqrt(1 - e * e);
+
+      const cosE = (e + cosNu) / (1 + e * cosNu);
+      const sinE = (sqrt1me2 * sinNu) / (1 + e * cosNu);
+
+      const E0 = Math.atan2(sinE, cosE);
+      const M0 = E0 - e * Math.sin(E0);
+
+      // keep sign for retrograde; normalize only for prograde for stability
+      this.M0 = dir < 0 ? M0 : normalizeAngle(M0);
+      this.valid = Number.isFinite(this.n) && Number.isFinite(this.M0);
+      return;
     }
-    return this.getTrajectoryElements();
+
+    // Hyperbolic (e > 1)
+    if (e > 1) {
+      // a will be negative for hyperbola
+      this.n = dir * Math.sqrt(mu / Math.abs(a ** 3));
+
+      // Convert nu0 -> F0 (hyperbolic anomaly)
+      // tanh(F/2) = sqrt((e-1)/(e+1)) * tan(nu/2)
+      const t = Math.tan(nu0 / 2);
+      const k = Math.sqrt((e - 1) / (e + 1));
+      const tanhF2 = k * t;
+
+      // F0 = 2 * atanh(tanhF2)
+      const F0 = 2 * 0.5 * Math.log((1 + tanhF2) / (1 - tanhF2));
+      const M0 = e * Math.sinh(F0) - F0;
+
+      this.M0 = M0;
+      this.valid = Number.isFinite(this.n) && Number.isFinite(this.M0);
+      return;
+    }
+
+    // Parabolic / near-parabolic not supported yet
+    this.valid = false;
   }
 
-  // --------------------------------------------------
-  // Orbital elements solver (elliptical + hyperbolic)
-  // --------------------------------------------------
-  getTrajectoryElements() {
-    const body = this.body;
-    const parent = this.parent;
+  // Newton solve: E - e sinE = M
+  _solveE(M) {
+    const e = this.e;
+    let E = M;
+    for (let i = 0; i < 12; i++) {
+      const f = E - e * Math.sin(E) - M;
+      const fp = 1 - e * Math.cos(E);
+      const d = f / fp;
+      E -= d;
+      if (Math.abs(d) < 1e-10) break;
+    }
+    return E;
+  }
 
-    // -----------------------------
-    // Relative state vectors
-    // -----------------------------
-    this.rVec = new Vector2D(
-      body.x - parent.x,
-      body.y - parent.y,
-      true
-    );
+  // Newton solve: e sinhF - F = M
+  _solveF(M) {
+    const e = this.e;
+    let F = Math.asinh(M / e); // decent starter
+    for (let i = 0; i < 14; i++) {
+      const f = e * Math.sinh(F) - F - M;
+      const fp = e * Math.cosh(F) - 1;
+      const d = f / fp;
+      F -= d;
+      if (Math.abs(d) < 1e-10) break;
+    }
+    return F;
+  }
 
-    this.vVec = new Vector2D(
-      body.vx - parent.vx,
-      body.vy - parent.vy,
-      true
-    );
-
-    this.r = this.rVec.r;
-    this.v = this.vVec.r;
-
-    if (this.r === 0) {
-      this.valid = false;
-      return null;
+  /**
+   * Kepler propagation
+   * @param {number} t Seconds since this trajectory's epoch
+   * @returns {{position: Vector2D, velocity: Vector2D}}
+   */
+  nextState(t) {
+    if (!this.valid) {
+      return {
+        position: this.body.realPosition.clone(),
+        velocity: this.body.realVelocity.clone(),
+      };
     }
 
-    // -----------------------------
-    // Gravitational parameter
-    // -----------------------------
-    this.mu = gravitationalConstant * parent.mass;
+    const e = this.e;
+    const mu = this.mu;
 
-    // -----------------------------
-    // Specific angular momentum (scalar in 2D)
-    // -----------------------------
-    this.h = this.rVec.cross(this.vVec);
+    // Parent state at "now" (V2: parent can move; for Earth it's static)
+    const parentPos = this.parent.realPosition;
+    const parentVel = this.parent.realVelocity;
 
-    // -----------------------------
-    // Specific orbital energy
-    // -----------------------------
-    this.energy = 0.5 * this.v * this.v - this.mu / this.r;
+    // --------------------------
+    // ELLIPTIC
+    // --------------------------
+    if (e < 1) {
+      const a = this.a;
 
-    // -----------------------------
-    // Semi-major axis
-    // -----------------------------
-    if (Math.abs(this.energy) > 1e-12) {
-      this.a = -this.mu / (2 * this.energy);
-    } else {
-      this.a = Infinity; // parabolic limit
-    }
+      const rawM = this.M0 + this.n * t;
+      const M = this.n >= 0 ? normalizeAngle(rawM) : rawM;
+      const E = this._solveE(M);
 
-    // -----------------------------
-    // Eccentricity vector
-    // e⃗ = ((v² − μ/r) r⃗ − (r⃗·v⃗) v⃗) / μ
-    // -----------------------------
-    const v2_minus_mu_r = this.v * this.v - this.mu / this.r;
+      const cosE = Math.cos(E);
+      const sinE = Math.sin(E);
 
-    this.eVec = this.rVec
-      .mul(v2_minus_mu_r)
-      .sub(this.vVec.mul(this.rVec.dot(this.vVec)))
-      .div(this.mu);
+      const sqrt1me2 = Math.sqrt(1 - e * e);
 
-    this.e = this.eVec.r;
+      // Orbital plane position (periapsis-aligned)
+      const xOrb = a * (cosE - e);
+      const yOrb = a * (sqrt1me2 * sinE);
 
-    // -----------------------------
-    // Semi-latus rectum
-    // -----------------------------
-    this.p = (this.h * this.h) / this.mu;
+      // Radius factor
+      const r = a * (1 - e * cosE);
+      const invR = 1 / Math.max(1e-12, r);
 
-    // -----------------------------
-    // Orbit classification
-    // -----------------------------
-    if (this.e < 1) {
-      this.orbitType = "elliptical";
-      this.isBound = true;
-    } else if (Math.abs(this.e - 1) < 1e-6) {
-      this.orbitType = "parabolic";
-      this.isBound = false;
-    } else {
-      this.orbitType = "hyperbolic";
-      this.isBound = false;
-    }
+      // Orbital plane velocity
+      // vx = -a n sinE / (1 - e cosE)
+      // vy =  a n sqrt(1-e^2) cosE / (1 - e cosE)
+      // a^2 factor keeps velocity magnitude consistent with vis-viva (see derivation)
+      const fac = a * a * this.n * invR;
+      const vxOrb = -fac * sinE;
+      const vyOrb = fac * sqrt1me2 * cosE;
 
-    // -----------------------------
-    // Argument of periapsis (ω)
-    // -----------------------------
-    this.omega =
-      this.e > 1e-10 ? this.eVec.angle : this.rVec.angle;
+      // Rotate by omega into inertial frame
+      const cosO = Math.cos(this.omega);
+      const sinO = Math.sin(this.omega);
 
-    // -----------------------------
-    // True anomaly (ν), signed
-    // -----------------------------
-    this.nu =
-      this.e > 1e-10
-        ? this.eVec.signedAngleTo(this.rVec)
-        : 0;
-
-    // -----------------------------
-    // Apsides
-    // -----------------------------
-    if (this.isBound) {
-      this.periapsis = this.a * (1 - this.e);
-      this.apoapsis = this.a * (1 + this.e);
-    } else {
-      this.periapsis = this.a * (1 - this.e);
-      this.apoapsis = Infinity;
-    }
-
-    // -----------------------------
-    // Period & mean motion (elliptical only)
-    // -----------------------------
-    if (this.isBound) {
-      this.period =
-        2 * Math.PI * Math.sqrt(
-          Math.pow(this.a, 3) / this.mu
-        );
-      this.meanMotion = Math.sqrt(
-        this.mu / Math.pow(this.a, 3)
+      const posRel = new Vector2D(
+        xOrb * cosO - yOrb * sinO,
+        xOrb * sinO + yOrb * cosO,
+        true
       );
-    } else {
-      this.period = Infinity;
-      this.meanMotion = NaN;
+
+      const velRel = new Vector2D(
+        vxOrb * cosO - vyOrb * sinO,
+        vxOrb * sinO + vyOrb * cosO,
+        true
+      );
+
+      return {
+        position: parentPos.add(posRel),
+        velocity: parentVel.add(velRel),
+      };
     }
 
-    // -----------------------------
-    // Anomalies & time-to-apsides
-    // -----------------------------
-    this.eccentricAnomaly = NaN;
-    this.meanAnomaly = NaN;
-    this.timeSincePeriapsis = NaN;
-    this.timeToPeriapsis = Infinity;
-    this.timeToApoapsis = Infinity;
+    // --------------------------
+    // HYPERBOLIC
+    // --------------------------
+    if (e > 1) {
+      const a = this.a; // negative
+      const M = this.M0 + this.n * t;
 
-    if (this.isBound && this.e > 1e-10) {
-      const E = trueToEccentricAnomaly(this.nu, this.e);
-      const M = normalizeAngle(E - this.e * Math.sin(E));
+      const F = this._solveF(M);
 
-      this.eccentricAnomaly = E;
-      this.meanAnomaly = M;
+      const coshF = Math.cosh(F);
+      const sinhF = Math.sinh(F);
 
-      const n = this.meanMotion;
-      const T = this.period;
+      // In hyperbolic orbit, use |a|
+      const absA = Math.abs(a);
+      const sqrtEm1 = Math.sqrt(e * e - 1);
 
-      const tSince = M / n;
-      this.timeSincePeriapsis = tSince;
+      // Position in periapsis-aligned frame
+      const xOrb = absA * (e - coshF);
+      const yOrb = absA * (sqrtEm1 * sinhF);
 
-      this.timeToPeriapsis = (T - tSince) % T;
+      // r = absA (e coshF - 1)
+      const r = absA * (e * coshF - 1);
+      const invR = 1 / Math.max(1e-12, r);
 
-      const deltaMToAp = normalizeAngle(Math.PI - M);
-      this.timeToApoapsis = deltaMToAp / n;
+      // Velocity
+      // from standard hyperbolic parametric derivatives
+      // retain full a^2 factor for correct hyperbolic speed
+      const fac = absA * absA * this.n * invR;
+      const vxOrb = -fac * sinhF;
+      const vyOrb = fac * sqrtEm1 * coshF;
+
+      const cosO = Math.cos(this.omega);
+      const sinO = Math.sin(this.omega);
+
+      const posRel = new Vector2D(
+        xOrb * cosO - yOrb * sinO,
+        xOrb * sinO + yOrb * cosO,
+        true
+      );
+
+      const velRel = new Vector2D(
+        vxOrb * cosO - vyOrb * sinO,
+        vxOrb * sinO + vyOrb * cosO,
+        true
+      );
+
+      return {
+        position: parentPos.add(posRel),
+        velocity: parentVel.add(velRel),
+      };
     }
 
-    this.valid = true;
-    return this;
+    // Parabolic fallback (not supported)
+    
+    return {
+      position: this.body.realPosition.clone(),
+      velocity: this.body.realVelocity.clone(),
+    };
   }
-
-  // --------------------------------------------------
-  // Polar orbit equation r(ν)
-  // --------------------------------------------------
-  radiusAtTrueAnomaly(nu) {
-    if (!this.valid) return NaN;
-    const denom = 1 + this.e * Math.cos(nu);
-    if (Math.abs(denom) < 1e-8) return Infinity;
-    return this.p / denom;
-  }
-
-  // --------------------------------------------------
-  // Position relative to parent at true anomaly ν
-  // --------------------------------------------------
-  positionAtTrueAnomaly(nu) {
-    const r = this.radiusAtTrueAnomaly(nu);
-    if (!Number.isFinite(r)) return null;
-    return new Vector2D(r, this.omega + nu, false);
-  }
-
-  // --------------------------------------------------
-  // Advance along orbit by dt (seconds)
-  // For on-rails bodies ONLY
-  // --------------------------------------------------
-  nextPoint(dt) {
-    if (!this.valid || !this.isBound) return null;
-
-    const M_next = normalizeAngle(
-      this.meanAnomaly + this.meanMotion * dt
-    );
-
-    const E_next = solveKepler(M_next, this.e);
-    const nu_next = eccentricToTrueAnomaly(E_next, this.e);
-
-    // Update stored anomalies (important for continuous motion)
-    this.meanAnomaly = M_next;
-    this.eccentricAnomaly = E_next;
-    this.nu = nu_next;
-
-    return this.positionAtTrueAnomaly(nu_next);
-  }
-
-  // --------------------------------------------------
-  // Future rendezvous API (NOT implemented yet)
-  // --------------------------------------------------
-  setTarget(targetBody) {
-    this.target = targetBody;
-  }
-
-  //toString function
-  toString() {
-    //return all the orbital variables
-    return (
-      "Orbit(" +
-      "a=" +
-      this.a +
-      ", e=" +  
-      this.e +
-      ", i=" +
-      this.i +
-      ", ω=" +
-      this.omega +
-      ", ν=" +
-      this.nu +
-      ", periapsis=" +
-      this.periapsis +
-      ", apoapsis=" +
-      this.apoapsis +
-      ", period=" +
-      this.period +
-      ", meanMotion=" +
-      this.meanMotion +
-      ", timeSincePeriapsis=" +
-      this.timeSincePeriapsis +
-      ", timeToPeriapsis=" +
-      this.timeToPeriapsis +
-      ", timeToApoapsis=" +
-      this.timeToApoapsis +
-      ")"
-    );
-  }
-}
-
-// ======================================================
-// Helper functions (file-local)
-// ======================================================
-
-function trueToEccentricAnomaly(nu, e) {
-  const t = Math.tan(nu / 2);
-  const factor = Math.sqrt((1 - e) / (1 + e));
-  return 2 * Math.atan(factor * t);
-}
-
-function eccentricToTrueAnomaly(E, e) {
-  const cosNu =
-    (Math.cos(E) - e) / (1 - e * Math.cos(E));
-  const sinNu =
-    (Math.sqrt(1 - e * e) * Math.sin(E)) /
-    (1 - e * Math.cos(E));
-  return Math.atan2(sinNu, cosNu);
-}
-
-function solveKepler(M, e) {
-  let E = e < 0.8 ? M : Math.PI;
-
-  for (let i = 0; i < 10; i++) {
-    const f = E - e * Math.sin(E) - M;
-    const fp = 1 - e * Math.cos(E);
-    E = E - f / fp;
-  }
-  return E;
-}
-
-function normalizeAngle(rad) {
-  const twoPi = 2 * Math.PI;
-  let a = rad % twoPi;
-  if (a < 0) a += twoPi;
-  return a;
 }

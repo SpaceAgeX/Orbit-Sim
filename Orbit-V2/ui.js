@@ -2,10 +2,66 @@
 // UI module (single source of truth for UI state: time scale + sim clock + HUD setters)
 
 let _timeScale = 1;     // warp multiplier (1x, 5x, etc)
+let _warpMode = "physics"; // "physics" | "fixed-low" | "fixed-high"
+
 let _simSeconds = 0;    // accumulated simulation time in seconds
 
 let _clockEls = null;   // cached DOM refs for clock
 let _uiApi = null;      // last initUI return (optional)
+let _uiState = {};      // latest HUD values pushed through setData
+
+const FIELD_DEFS = [
+  { key: "altitude", elementId: "altitudeValue", defaultValue: "0 m" },
+  { key: "velocity", elementId: "velocityValue", defaultValue: "0 m/s" },
+  { key: "accel", elementId: "accelValue", defaultValue: "0.00 g" },
+  { key: "heading", elementId: "headingValue", defaultValue: "000 \u00B0" },
+
+  { key: "apoapsis", elementId: "apoapsisValue", defaultValue: "--" },
+  { key: "timeToAp", elementId: "timeToApValue", defaultValue: "--" },
+  { key: "periapsis", elementId: "periapsisValue", defaultValue: "--" },
+  { key: "timeToPe", elementId: "timeToPeValue", defaultValue: "--" },
+  { key: "eccentricity", elementId: "eccentricityValue", defaultValue: "--" },
+  { key: "period", elementId: "periodValue", defaultValue: "--" },
+  { key: "semiMajorAxis", elementId: "semimajorValue", aliases: ["sma", "SMA"], defaultValue: "--" },
+  { key: "argumentOfPeriapsis", elementId: "argumentValue", aliases: ["omega"], defaultValue: "--" },
+
+  { key: "targetRelVel", elementId: "targetRelVel", defaultValue: "--" },
+  { key: "targetSeparation", elementId: "targetSeparation", defaultValue: "--" },
+  { key: "targetClosest", elementId: "targetClosest", defaultValue: "--" },
+  { key: "targetTimeCA", elementId: "targetTimeCA", defaultValue: "--" },
+
+  { key: "bodySelected", elementId: "bodySelected", defaultValue: "Earth" },
+  { key: "bodyMass", elementId: "bodyMass", defaultValue: "5.97e24 kg" },
+  { key: "bodySituation", elementId: "bodySituation", defaultValue: "Static" },
+  { key: "bodySOI", elementId: "bodySOI", defaultValue: "--" },
+  { key: "bodyLockedOn", elementId: "bodyLockedOn", defaultValue: "No" },
+
+  { key: "manDeltaV", elementId: "manDeltaV", defaultValue: "--" },
+  { key: "manDuration", elementId: "manDuration", defaultValue: "--" },
+  { key: "manBurnStart", elementId: "manBurnStart", defaultValue: "--" },
+  { key: "manTWR", elementId: "manTWR", defaultValue: "--" },
+  { key: "manHeading", elementId: "manHeading", defaultValue: "--" },
+
+  // special handling in code (not a text element)
+  { key: "thrustPct", elementId: null, defaultValue: 0 }
+];
+
+const FIELD_INDEX = new Map();
+const DEFAULT_UI_STATE = {};
+FIELD_DEFS.forEach((def) => {
+  FIELD_INDEX.set(def.key, def);
+  (def.aliases || []).forEach((alias) => FIELD_INDEX.set(alias, def));
+  DEFAULT_UI_STATE[def.key] = def.defaultValue;
+});
+
+const normalizeDataKeys = (data = {}) => {
+  const normalized = {};
+  Object.entries(data || {}).forEach(([key, value]) => {
+    const def = FIELD_INDEX.get(key);
+    if (def) normalized[def.key] = value;
+  });
+  return normalized;
+};
 
 // ---------- helpers ----------
 const pad2 = (n) => String(Math.floor(n)).padStart(2, "0");
@@ -70,15 +126,24 @@ export function setSimTime(seconds) {
   renderClock();
 }
 
+export function getWarpMode() {
+  return _warpMode;
+}
+
+export function getUIState() {
+  return { ..._uiState };
+}
+
 // ---------- main init ----------
 export function initUI(initialData = {}) {
   const setCSSVarPct = (name, pct) => {
     document.documentElement.style.setProperty(name, (pct / 100).toString());
   };
 
-  const setText = (id, value) => {
-    const el = document.getElementById(id);
-    if (el && value !== undefined && value !== null) el.textContent = String(value);
+  const setText = (el, value) => {
+    if (!el) return;
+    const nextValue = value ?? "";
+    el.textContent = String(nextValue);
   };
 
   // cache clock refs once and render immediately
@@ -91,22 +156,18 @@ export function initUI(initialData = {}) {
 
   const thrustFill = document.getElementById("thrustFill");
   const thrustLabel = document.getElementById("thrustLabel");
-  const velocityValue = document.getElementById("velocityValue");
-  const accelValue = document.getElementById("accelValue");
-  const headingValue = document.getElementById("headingValue");
 
   // -----------------------------
   // TIME WARP UI (hover + click fallback)
   // -----------------------------
   if (timePanel && warpButtons) {
     const modeSets = [
-      { name: "Physics", values: [1, 2, 3, 5, 8, 10, 12, 15, 20] },
-      { name: "Fixed Low", values: [1, 5, 10, 50, 100, 1000, 10000, 100000] },
-      { name: "Fixed High", values: [1, 10, 1000, 10000, 100000, 1000000, 10000000, 100000000] }
+      { name: "Physics", mode: "physics", values: [1, 2, 3, 5, 8, 10, 12, 15, 20] },
+      { name: "Fixed Low", mode: "fixed-low", values: [1, 5, 10, 50, 100, 1000, 10000, 100000] },
+      { name: "Fixed High", mode: "fixed-high", values: [1, 10, 1000, 10000, 100000, 1000000, 10000000, 100000000] }
     ];
     let modeIndex = 0;
 
-   
     const fmtLabel = (v) => {
       if (v >= 1_000_000) {
         return `${Math.round(v / 1_000_000)}M`;
@@ -119,9 +180,21 @@ export function initUI(initialData = {}) {
       return `${v}x`;
     };
 
+    const updateModeState = () => {
+      const current = modeSets[modeIndex];
 
+      // Never override physics at 1x
+      if (_timeScale === 1) {
+        _warpMode = "physics";
+        return;
+      }
 
+      _warpMode = current.mode;
 
+      if (!current.values.includes(_timeScale)) {
+        _timeScale = current.values[0];
+      }
+    };
 
 
     const updateActiveButtons = () => {
@@ -134,15 +207,26 @@ export function initUI(initialData = {}) {
     const renderButtons = () => {
       warpButtons.innerHTML = "";
 
+      const current = modeSets[modeIndex];
+      updateModeState();
+
       // Mode toggle first
       const toggle = document.createElement("button");
-      toggle.textContent = modeSets[modeIndex].name;
+      toggle.textContent = current.name;
       toggle.dataset.modeToggle = "true";
       toggle.addEventListener("click", (e) => {
         e.stopPropagation();
+
+        // Switch tab
         modeIndex = (modeIndex + 1) % modeSets.length;
+
+        // 🔒 RULE: switching tabs always resets to physics 1x
+        _timeScale = 1;
+        _warpMode = "physics";
+
         renderButtons();
       });
+
       warpButtons.appendChild(toggle);
 
       const addSep = () => {
@@ -153,7 +237,7 @@ export function initUI(initialData = {}) {
 
       addSep();
 
-      modeSets[modeIndex].values.forEach((val, idx) => {
+      current.values.forEach((val, idx) => {
         const btn = document.createElement("button");
         btn.textContent = `${fmtLabel(val)}`;
         btn.dataset.scale = String(val);
@@ -161,10 +245,19 @@ export function initUI(initialData = {}) {
         btn.addEventListener("click", (e) => {
           e.stopPropagation();
           _timeScale = val;
+
+          // 🔒 RULE: 1x is always physics
+          if (val === 1) {
+            _warpMode = "physics";
+          } else {
+            _warpMode = current.mode;
+          }
+
           updateActiveButtons();
         });
+
         warpButtons.appendChild(btn);
-        if (idx < modeSets[modeIndex].values.length - 1) addSep();
+        if (idx < current.values.length - 1) addSep();
       });
     };
 
@@ -181,7 +274,7 @@ export function initUI(initialData = {}) {
 
     // click fallback (helps if hover is blocked by CSS/pointer-events quirks)
     timePanel.addEventListener("click", (e) => {
-      // don’t toggle when clicking a warp button itself
+      // don't toggle when clicking a warp button itself
       if (e.target && e.target.closest && e.target.closest("#warpButtons")) return;
       warpButtons.classList.toggle("visible");
     });
@@ -332,7 +425,7 @@ export function initUI(initialData = {}) {
       navCtx.restore();
     };
 
-    // Continuous render loop (fixes “blank canvas” cases)
+    // Continuous render loop (prevents a blank canvas on first paint)
     const navLoop = () => {
       drawNavball();
       requestAnimationFrame(navLoop);
@@ -340,14 +433,8 @@ export function initUI(initialData = {}) {
     requestAnimationFrame(navLoop);
 
     // Hook state updates via applyData below
-    // (we’ll update navState inside applyData using headingRad/progradeRad/radialOutRad)
     initUI._navState = navState; // internal stash
   }
-
-  // Demo values for HUD text (safe defaults)
-  if (velocityValue) velocityValue.textContent = "0 m/s";
-  if (accelValue) accelValue.textContent = "0.00 g";
-  if (headingValue) headingValue.textContent = "—";
 
   // Legend buttons: make glow only when pressed
   const toggleButtons = Array.from(document.querySelectorAll(".legend-btn"));
@@ -463,52 +550,48 @@ export function initUI(initialData = {}) {
   backButton?.addEventListener("click", showMainMenu);
   quitButton?.addEventListener("click", closePause);
 
-  // ✅ setData: includes SMA + omega; also updates navball state if provided
-  const applyData = (data) => {
-    setText("altitudeValue", data.altitude);
-    setText("velocityValue", data.velocity);
-    setText("accelValue", data.accel);
-    setText("headingValue", data.heading);
-
-    setText("apoapsisValue", data.apoapsis);
-    setText("timeToApValue", data.timeToAp);
-    setText("periapsisValue", data.periapsis);
-    setText("timeToPeValue", data.timeToPe);
-    setText("eccentricityValue", data.eccentricity);
-    setText("periodValue", data.period);
-
-    setText("semimajorValue", data.semiMajorAxis ?? data.sma ?? data.SMA);
-    setText("argumentValue", data.omega ?? data.argumentOfPeriapsis);
-
-    setText("targetRelVel", data.targetRelVel);
-    setText("targetSeparation", data.targetSeparation);
-    setText("targetClosest", data.targetClosest);
-    setText("targetTimeCA", data.targetTimeCA);
-
-    setText("bodySelected", data.bodySelected);
-    setText("bodyMass", data.bodyMass);
-    setText("bodySituation", data.bodySituation);
-    setText("bodySOI", data.bodySOI);
-    setText("bodyLockedOn", data.bodyLockedOn);
-
-    setText("manDeltaV", data.manDeltaV);
-    setText("manDuration", data.manDuration);
-    setText("manBurnStart", data.manBurnStart);
-    setText("manTWR", data.manTWR);
-    setText("manHeading", data.manHeading);
-
-    if (typeof data.thrustPct === "number") setThrustFn(data.thrustPct);
-
-    // Optional real navball driving (radians). If not provided, it stays demo.
-    const ns = initUI._navState;
-    if (ns) {
-      if (typeof data.headingRad === "number") ns.heading = data.headingRad;
-      if (typeof data.progradeRad === "number") ns.prograde = data.progradeRad;
-      if (typeof data.radialOutRad === "number") ns.radialOut = data.radialOutRad;
+  // Field bindings (text content)
+  const elementRefs = {};
+  FIELD_DEFS.forEach((def) => {
+    if (def.elementId) {
+      elementRefs[def.key] = document.getElementById(def.elementId);
     }
+  });
+
+  const applyNavState = (data = {}) => {
+    const ns = initUI._navState;
+    if (!ns) return;
+    if (typeof data.headingRad === "number") ns.heading = data.headingRad;
+    if (typeof data.progradeRad === "number") ns.prograde = data.progradeRad;
+    if (typeof data.radialOutRad === "number") ns.radialOut = data.radialOutRad;
   };
 
-  applyData(initialData);
+  const applyFieldValue = (key, value) => {
+    const def = FIELD_INDEX.get(key);
+    if (!def) return;
+
+    const nextValue = value ?? DEFAULT_UI_STATE[def.key];
+    _uiState[def.key] = nextValue;
+
+    if (def.key === "thrustPct") {
+      setThrustFn(nextValue);
+      return;
+    }
+
+    const el = elementRefs[def.key];
+    if (el) setText(el, nextValue);
+  };
+
+  const setData = (data = {}) => {
+    const normalized = normalizeDataKeys(data);
+    Object.entries(normalized).forEach(([key, value]) => applyFieldValue(key, value));
+    applyNavState(data);
+  };
+
+  // push defaults immediately, then apply caller-provided values
+  _uiState = { ...DEFAULT_UI_STATE };
+  setData(DEFAULT_UI_STATE);
+  setData(initialData);
 
   const getScaleValues = () => ({
     ui: Number(document.getElementById("uiScaleRange")?.value || 0),
@@ -520,7 +603,8 @@ export function initUI(initialData = {}) {
   });
 
   _uiApi = {
-    setData: applyData,
+    setData,
+    getData: () => ({ ..._uiState }),
     getScales: getScaleValues,
     openPause,
     closePause,

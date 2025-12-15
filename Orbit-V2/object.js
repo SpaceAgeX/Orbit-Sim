@@ -1,9 +1,10 @@
 // Object.js
 // ======================================================
-// Base Object — simplest spatial entity in the sim
+// Base Object - simplest spatial entity in the sim
 // ======================================================
 
 import { Vector2D } from "./geometry.js";
+import { Trajectory } from "./trajectory.js";
 export const G = 6.67408e-11;
 
 export class Object {
@@ -61,6 +62,7 @@ export class Body extends Object {
     // orbital state
     this.parent = null;
     this.trajectory = null;
+    this.trajectoryTime = 0;
 
     // physics state
     this.netForce = new Vector2D(0, 0, true);
@@ -68,6 +70,77 @@ export class Body extends Object {
     if (this.influential) {
       Body.influentialBodies.push(this);
     }
+  }
+
+  findGreatestInfluencer() {
+    let greatest = null;
+    let maxForce = 0;
+
+    for (const other of Body.influentialBodies) {
+      if (other === this) continue;
+
+      // Vector from this to other (meters)
+      const rVec = other.realPosition.sub(this.realPosition);
+      const distSq = rVec.r * rVec.r;
+
+      if (distSq === 0) continue;
+
+      // Newtonian gravity magnitude
+      const force = G * this.mass * other.mass / distSq;
+
+      if (force > maxForce) {
+        maxForce = force;
+        greatest = other;
+      }
+    }
+
+    this.parent = greatest;
+    return greatest;
+  }
+
+  switchState(targetWarpMode = "physics", dt = 0) {
+    // physics warp -> run full n-body, fixed warp -> stay on Kepler rails
+    const targetMotionMode = targetWarpMode === "physics" ? "nbody" : "kepler";
+
+    if (this.motionMode === targetMotionMode) {
+      return;
+    }
+
+    if (targetMotionMode === "kepler") {
+      this.parent = this.findGreatestInfluencer();
+
+      if (!this.parent) {
+        console.warn("Kepler switch failed: no parent found");
+        return;
+      }
+
+      this.trajectory = new Trajectory(this, this.parent);
+      // Snap body state to the freshly-built Kepler solution so position/velocity stay continuous
+      const stateNow = this.trajectory.nextState(0);
+      if (stateNow?.position && stateNow?.velocity) {
+        this.realPosition = stateNow.position;
+        this.realVelocity = stateNow.velocity;
+      }
+      this.trajectoryTime = 0;
+      this.motionMode = "kepler";
+      return;
+    }
+
+    // Switching back to live physics: sample current Kepler state (include this frame's dt) before releasing the rails
+    if (this.motionMode === "kepler" && this.trajectory) {
+      const sampleTime = this.trajectoryTime + dt;
+      const { position, velocity } = this.trajectory.nextState(sampleTime);
+      this.realPosition = position;
+      this.realVelocity = velocity;
+      this.trajectoryTime = sampleTime;
+    }
+    this.motionMode = "nbody";
+  }
+
+  computeTrajectory() {
+    this.parent = this.findGreatestInfluencer();
+    this.trajectory = new Trajectory(this, this.parent);
+    this.trajectoryTime = 0;
   }
 
   // ----------------------------
@@ -97,9 +170,11 @@ export class Body extends Object {
     if (this.sBody) return;
 
     if (this.motionMode === "kepler" && this.trajectory) {
-      const nextPos = this.trajectory.nextPoint(dt);
-      if (nextPos) {
-        this.realPosition = nextPos;
+      this.trajectoryTime += dt;
+      const nextState = this.trajectory.nextState(this.trajectoryTime);
+      if (nextState?.position && nextState?.velocity) {
+        this.realPosition = nextState.position;
+        this.realVelocity = nextState.velocity;
       }
       return;
     }
@@ -113,6 +188,10 @@ export class Body extends Object {
       );
 
       super.update(dt);
+      return;
     }
+
+    // Fallback: if an unknown mode slips through, drift at current velocity
+    super.update(dt);
   }
 }
