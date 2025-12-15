@@ -117,6 +117,7 @@ export class Vector2D {
 
 // --- scale constants (used ONLY for drawing) ---
 export const KM_PER_PIXEL = 10;
+const METERS_PER_PIXEL = KM_PER_PIXEL * 1000;
 
 // View bounds (km-per-pixel based zoom limits)
 export const MIN_KM_PER_PIXEL = 1;
@@ -143,6 +144,10 @@ export function effectiveKmPerPixel() {
 
 export function kmToPixels(km) {
   return km / KM_PER_PIXEL;
+}
+
+export function mToPixels(m) {
+  return m / METERS_PER_PIXEL;
 }
 
 

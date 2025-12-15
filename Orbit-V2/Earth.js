@@ -6,14 +6,14 @@
 // ======================================================
 
 import { Body } from "./object.js";
-import { Vector2D, kmToPixels } from "./geometry.js";
+import { Vector2D, kmToPixels, mToPixels } from "./geometry.js";
 
 // ------------------------------------------------------
 // Real Earth constants
 // ------------------------------------------------------
 
 const EARTH_RADIUS_KM = 6371;
-const EARTH_RADIUS_M = EARTH_RADIUS_KM * 1000;
+//const EARTH_RADIUS_M = EARTH_RADIUS_KM * 1000;
 const EARTH_MASS_KG = 5.972e24;
 
 // ------------------------------------------------------
@@ -29,7 +29,7 @@ export class Earth extends Body {
       position: new Vector2D(0, 0, true),   // world origin (meters)
       velocity: new Vector2D(0, 0, true),
       mass: EARTH_MASS_KG,
-      radius: EARTH_RADIUS_M,
+      radius: EARTH_RADIUS_KM,
       sBody: true,                          // static
       influential: true,                   // produces gravity
       motionMode: "kepler"                 // irrelevant, Earth does not move
@@ -45,22 +45,24 @@ export class Earth extends Body {
   // ctx is already pan/zoom transformed
   // --------------------------------------------------
   draw(ctx) {
-    const radiusPx = kmToPixels(this.radius);
+  if (!this.image.complete) return;
 
-    ctx.save();
-    ctx.translate(
-      this.realPosition.x,
-      this.realPosition.y
-    );
+  const xPx = kmToPixels(this.realPosition.x / 1000);
+  const yPx = kmToPixels(this.realPosition.y / 1000);
+  const radiusPx = kmToPixels(this.realRadius);
 
-    ctx.drawImage(
-      this.image,
-      -radiusPx,
-      -radiusPx,
-      radiusPx * 2,
-      radiusPx * 2
-    );
+  ctx.save();
+  ctx.translate(xPx, yPx);
 
-    ctx.restore();
-  }
+  ctx.drawImage(
+    this.image,
+    -radiusPx,
+    -radiusPx,
+    radiusPx * 2,
+    radiusPx * 2
+  );
+
+  ctx.restore();
+}
+
 }
