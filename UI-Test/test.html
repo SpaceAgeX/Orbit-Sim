@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Orbits</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+
+  <body>
+    <div class="canvas-wrapper">
+      <canvas id="game"></canvas>
+
+      <!-- TIME PANEL (Clock + Warp buttons) -->
+      <div id="timePanel" class="ui-panel timepanel">
+        <div class="timepanel-top">
+          <div id="simClock">
+            <div id="simClock" class="clock-bar">
+
+              <div class="clock-segment">
+                <div id="clockYears" class="clock-number">0</div>
+                <div class="clock-label">years</div>
+              </div>
+              <div class="clock-separator"></div>
+            
+              <div class="clock-segment">
+                <div id="clockDays" class="clock-number">0</div>
+                <div class="clock-label">days</div>
+              </div>
+              <div class="clock-separator"></div>
+            
+              <div class="clock-segment">
+                <div id="clockHours" class="clock-number">00</div>
+                <div class="clock-label">hours</div>
+              </div>
+              <div class="clock-separator"></div>
+            
+              <div class="clock-segment">
+                <div id="clockMinutes" class="clock-number">00</div>
+                <div class="clock-label">minutes</div>
+              </div>
+              <div class="clock-separator"></div>
+            
+              <div class="clock-segment">
+                <div id="clockSeconds" class="clock-number">00</div>
+                <div class="clock-label">seconds</div>
+              </div>
+            
+            </div>
+            
+          </div>
+        </div>
+
+        <div id="warpButtons" class="warp-buttons">
+          <!-- buttons generated dynamically -->
+        </div>
+      </div>
+
+      <div id="altitudeBox">
+        <span class="label panel-title">Altitude</span>
+        <span class="value" id="altitudeValue">120,000 m</span>
+      </div>
+
+      <div id="infoContainer">
+        <div class="info-tabs">
+          <button class="info-tab active" data-tab="orbital">Orbital Data</button>
+          <button class="info-tab" data-tab="target">Target Data</button>
+          <button class="info-tab" data-tab="body">Body Status</button>
+          <button class="info-tab" data-tab="maneuver">Maneuver</button>
+        </div>
+
+        <div class="info-content" data-tab-panel="orbital">
+          <div class="info-title panel-title">Orbital Data:</div>
+          <div class="info-row paired">
+            <span class="info-label">Ap</span>
+            <span class="info-value" id="apoapsisValue">120,000 m</span>
+            <span class="info-label">Time to Ap</span>
+            <span class="info-value" id="timeToApValue">2m 30s</span>
+          </div>
+          <div class="info-row paired">
+            <span class="info-label">Pe</span>
+            <span class="info-value" id="periapsisValue">90,000 m</span>
+            <span class="info-label">Time to Pe</span>
+            <span class="info-value" id="timeToPeValue">12m 45s</span>
+          </div>
+          <div class="info-row paired">
+            <span class="info-label">Ecc</span>
+            <span class="info-value" id="eccentricityValue">0.05</span>
+            <span class="info-label">Period</span>
+            <span class="info-value" id="periodValue">34m 12s</span>
+          </div>
+        </div>
+
+        <div class="info-content hidden" data-tab-panel="target">
+          <div class="info-title panel-title">Target Data</div>
+          <div class="info-row">
+            <span class="info-label">Relative Vel</span>
+            <span class="info-value" id="targetRelVel">25 m/s</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Separation</span>
+            <span class="info-value" id="targetSeparation">2.5 km</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Closest Approach</span>
+            <span class="info-value" id="targetClosest">120 m</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Time to CA</span>
+            <span class="info-value" id="targetTimeCA">1m 10s</span>
+          </div>
+        </div>
+
+        <div class="info-content hidden" data-tab-panel="body">
+          <div class="info-title panel-title">Body Status</div>
+          <div class="info-row">
+            <span class="info-label">Selected</span>
+            <span class="info-value" id="bodySelected">Ship</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Mass</span>
+            <span class="info-value" id="bodyMass">1,000 kg</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Situation</span>
+            <span class="info-value" id="bodySituation">Orbit</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">SOI</span>
+            <span class="info-value" id="bodySOI">Earth</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Locked On</span>
+            <span class="info-value" id="bodyLockedOn">Ship</span>
+          </div>
+        </div>
+
+        <div class="info-content hidden" data-tab-panel="maneuver">
+          <div class="info-title panel-title">Maneuver Details</div>
+          <div class="info-row">
+            <span class="info-label">Delta V</span>
+            <span class="info-value" id="manDeltaV">320 m/s</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Duration</span>
+            <span class="info-value" id="manDuration">18s</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Start Burn</span>
+            <span class="info-value" id="manBurnStart">0d 0h 0m 9s</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">TWR</span>
+            <span class="info-value" id="manTWR">1.8</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Heading</span>
+            <span class="info-value" id="manHeading">090°</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="hudCluster">
+        <div id="thrustContainer">
+          <div id="accelBox">
+            <span class="value" id="accelValue">00.00 g</span>
+          </div>
+          <div id="thrustBar">
+            <div id="thrustLabel">35%</div>
+            <div id="thrustFill"></div>
+          </div>
+        </div>
+
+        <div id="navballContainer">
+          <div id="velocityBox">
+            <span class="value" id="velocityValue">0 m/s</span>
+          </div>
+          <canvas id="navball" width="200" height="200"></canvas>
+          <div id="headingBox">
+            <span class="label">HDG</span>
+            <span class="value" id="headingValue">0Aų</span>
+          </div>
+        </div>
+
+        <div id="legendBox">
+          <div class="legend-item">
+            <span class="legend-btn">SAS</span>
+            <span>SAS</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-btn">RCS</span>
+            <span>RCS</span>
+          </div>
+          <div class="legend-item">
+            <button class="legend-dot-btn" style="color:#facc15;"></button><span>Prograde</span>
+          </div>
+          <div class="legend-item">
+            <button class="legend-dot-btn" style="color:#f87272;"></button><span>Retrograde</span>
+          </div>
+          <div class="legend-item">
+            <button class="legend-dot-btn" style="color:#22d3ee;"></button><span>Radial Out</span>
+          </div>
+          <div class="legend-item">
+            <button class="legend-dot-btn" style="color:#e879f9;"></button><span>Radial In</span>
+          </div>
+          <div class="legend-item">
+            <button class="legend-dot-btn" style="color:#9ca3af;" data-disabled="true"></button><span>Target</span>
+          </div>
+          <div class="legend-item">
+            <button class="legend-dot-btn" style="color:#9ca3af;" data-disabled="true"></button><span>Anti-Target</span>
+          </div>
+          <div class="legend-item">
+            <button class="legend-dot-btn" style="color:#9ca3af;" data-disabled="true"></button><span>Maneuver</span>
+          </div>
+          <div class="legend-item">
+            <button class="legend-dot-btn" style="color:#7cffd4;"></button><span>Hold</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Minimap placeholder -->
+      <div id="minimapContainer">
+        <div class="minimap-toolbar">
+          <select id="minimapMode" aria-label="Display mode">
+            <option value="minimap">Minimap</option>
+            <option value="graph">Graph</option>
+            <option value="burn">Burn</option>
+          </select>
+        </div>
+        <div id="minimap"></div>
+      </div>
+
+    <!-- Pause Overlay -->
+    <div id="pauseOverlay">
+      <div id="pauseWindow">
+        <div class="pause-header">
+          <button id="settingsBack" class="icon-btn hidden" aria-label="Back to menu">&lt;</button>
+          <h2 id="pauseTitle" class="panel-title">Paused</h2>
+          <button id="pauseClose" class="icon-btn" aria-label="Close pause menu">x</button>
+        </div>
+        <div class="pause-body">
+          <div class="menu-buttons" id="mainMenu">
+            <button class="pause-btn" data-action="resume">Resume</button>
+            <button class="pause-btn" data-open="settings">Settings</button>
+            <button class="pause-btn" data-action="quit">Quit</button>
+          </div>
+          <div id="settingsPanel" class="hidden">
+            <h3 class="panel-title">Scaling</h3>
+            <div class="setting-row">
+              <label for="uiScaleRange">UI Scale</label>
+              <input type="range" id="uiScaleRange" min="50" max="150" step="1" value="100">
+              <span class="setting-value" id="uiScaleValue">100%</span>
+            </div>
+            <div class="setting-row">
+              <label for="clockScaleRange">Clock Scale</label>
+              <input type="range" id="clockScaleRange" min="50" max="150" step="1" value="100">
+              <span class="setting-value" id="clockScaleValue">100%</span>
+            </div>
+            <div class="setting-row">
+              <label for="altitudeScaleRange">Altitude Scale</label>
+              <input type="range" id="altitudeScaleRange" min="50" max="150" step="1" value="100">
+              <span class="setting-value" id="altitudeScaleValue">100%</span>
+            </div>
+            <div class="setting-row">
+              <label for="navballScaleRange">Navball Cluster Scale</label>
+              <input type="range" id="navballScaleRange" min="50" max="150" step="1" value="100">
+              <span class="setting-value" id="navballScaleValue">100%</span>
+            </div>
+            <div class="setting-row">
+              <label for="minimapScaleRange">Minimap Scale</label>
+              <input type="range" id="minimapScaleRange" min="50" max="150" step="1" value="100">
+              <span class="setting-value" id="minimapScaleValue">100%</span>
+            </div>
+            <div class="setting-row">
+              <label for="infoScaleRange">Info Panel Scale</label>
+              <input type="range" id="infoScaleRange" min="50" max="150" step="1" value="100">
+              <span class="setting-value" id="infoScaleValue">100%</span>
+            </div>
+            <div class="setting-row">
+              <label for="minimapScaleRange">Minimap Scale</label>
+              <input type="range" id="minimapScaleRange" min="50" max="150" step="1" value="100">
+              <span class="setting-value" id="minimapScaleValue">100%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  <script type="module" src="index.js"></script>
+ </body>
+</html>
