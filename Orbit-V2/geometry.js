@@ -120,8 +120,9 @@ export const KM_PER_PIXEL = 10;
 const METERS_PER_PIXEL = KM_PER_PIXEL * 1000;
 
 // View bounds (km-per-pixel based zoom limits)
+// Allow very large scales to see the full solar system
 export const MIN_KM_PER_PIXEL = 1;
-export const MAX_KM_PER_PIXEL = 2000;
+export const MAX_KM_PER_PIXEL = 10_000_000;
 
 export const MIN_ZOOM = KM_PER_PIXEL / MAX_KM_PER_PIXEL;
 export const MAX_ZOOM = KM_PER_PIXEL / MIN_KM_PER_PIXEL;

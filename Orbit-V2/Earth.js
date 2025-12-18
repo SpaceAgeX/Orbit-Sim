@@ -1,68 +1,24 @@
-// Earth.js
-// ======================================================
-// Earth — static, influential body
-// Uses real-world constants
-// Draw-only specialization of Body
-// ======================================================
+import { SpriteBody } from "./planetBase.js";
 
-import { Body } from "./object.js";
-import { Vector2D, kmToPixels, mToPixels } from "./geometry.js";
-
-// ------------------------------------------------------
-// Real Earth constants
-// ------------------------------------------------------
-
-const EARTH_RADIUS_KM = 6371;
-//const EARTH_RADIUS_M = EARTH_RADIUS_KM * 1000;
+const EARTH_RADIUS_M = 6_371_000;
 const EARTH_MASS_KG = 5.972e24;
 
-// ------------------------------------------------------
-// Asset
-// ------------------------------------------------------
-
-const EARTH_IMAGE_SRC = "./public/Earth.png";
-
-export class Earth extends Body {
-  constructor() {
+export class Earth extends SpriteBody {
+  constructor(parent, theta = 0.6) {
     super({
       name: "Earth",
-      position: new Vector2D(0, 0, true),   // world origin (meters)
-      velocity: new Vector2D(0, 0, true),
       mass: EARTH_MASS_KG,
-      radius: EARTH_RADIUS_KM,
-      sBody: true,                          // static
-      influential: true,                   // produces gravity
-      motionMode: "kepler"                 // irrelevant, Earth does not move
+      radius: EARTH_RADIUS_M,
+      texture: "./Public/Earth.png",
+      color: "#69b7ff",
+      pathColor: "#69b7ff",
+      spriteFadeKmPerPx: 6000,
+      parent,
+      semimajor: 149_598_023_000,
+      theta,
+      sBody: false,
+      influential: true,
+      motionMode: "kepler",
     });
-
-    // --- rendering ---
-    this.image = new Image();
-    this.image.src = EARTH_IMAGE_SRC;
   }
-
-  // --------------------------------------------------
-  // Draw Earth
-  // ctx is already pan/zoom transformed
-  // --------------------------------------------------
-  draw(ctx) {
-  if (!this.image.complete) return;
-
-  const xPx = kmToPixels(this.realPosition.x / 1000);
-  const yPx = kmToPixels(this.realPosition.y / 1000);
-  const radiusPx = kmToPixels(this.realRadius);
-
-  ctx.save();
-  ctx.translate(xPx, yPx);
-
-  ctx.drawImage(
-    this.image,
-    -radiusPx,
-    -radiusPx,
-    radiusPx * 2,
-    radiusPx * 2
-  );
-
-  ctx.restore();
-}
-
 }

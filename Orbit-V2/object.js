@@ -49,7 +49,8 @@ export class Body extends Object {
     radius,
     sBody = false,
     influential = false,
-    motionMode = "kepler" // "kepler" | "nbody"
+    motionMode = "kepler", // "kepler" | "nbody"
+    controlable = false
   }) {
     super({ name, position, velocity, mass, sBody });
 
@@ -58,6 +59,7 @@ export class Body extends Object {
     // behavior flags
     this.influential = influential;
     this.motionMode = motionMode;
+    this.externalForce = new Vector2D(0, 0, true);
 
     // orbital state
     this.parent = null;
@@ -66,6 +68,8 @@ export class Body extends Object {
 
     // physics state
     this.netForce = new Vector2D(0, 0, true);
+    this.groundedOn = null;
+    this.groundedNormal = null;
 
     if (this.influential) {
       Body.influentialBodies.push(this);
@@ -143,6 +147,39 @@ export class Body extends Object {
     this.trajectoryTime = 0;
   }
 
+  resolveCollisions(nextPosition, nextVelocity) {
+    let resolvedPosition = nextPosition;
+    let resolvedVelocity = nextVelocity;
+    let groundedOn = null;
+    let groundedNormal = null;
+
+    for (const other of Object.bodies) {
+      if (other === this) continue;
+      const thisR = this.realRadius || 0;
+      const otherR = other.realRadius || 0;
+      const sumR = thisR + otherR;
+      if (sumR <= 0) continue;
+
+      const delta = resolvedPosition.sub(other.realPosition);
+      const dist = delta.mag();
+
+      if (dist <= sumR && dist > 0) {
+        const n = delta.normalize();
+        resolvedPosition = other.realPosition.add(n.mul(sumR));
+        resolvedVelocity = new Vector2D(0, 0, true);
+        groundedOn = other;
+        groundedNormal = n;
+      } else if (dist === 0) {
+        resolvedPosition = other.realPosition.add(new Vector2D(sumR, 0, true));
+        resolvedVelocity = new Vector2D(0, 0, true);
+        groundedOn = other;
+        groundedNormal = new Vector2D(1, 0, true);
+      }
+    }
+
+    return { position: resolvedPosition, velocity: resolvedVelocity, groundedOn, groundedNormal };
+  }
+
   // ----------------------------
   // Gravity force accumulation
   // ----------------------------
@@ -161,6 +198,10 @@ export class Body extends Object {
         rVec.normalize().mul(forceMag)
       );
     }
+
+    if (this.externalForce) {
+      this.netForce = this.netForce.add(this.externalForce);
+    }
   }
 
   // ----------------------------
@@ -169,29 +210,41 @@ export class Body extends Object {
   update(dt) {
     if (this.sBody) return;
 
+    let nextPosition = this.realPosition;
+    let nextVelocity = this.realVelocity;
+
     if (this.motionMode === "kepler" && this.trajectory) {
       this.trajectoryTime += dt;
       const nextState = this.trajectory.nextState(this.trajectoryTime);
       if (nextState?.position && nextState?.velocity) {
-        this.realPosition = nextState.position;
-        this.realVelocity = nextState.velocity;
+        nextPosition = nextState.position;
+        nextVelocity = nextState.velocity;
       }
-      return;
-    }
-
-    if (this.motionMode === "nbody") {
+    } else if (this.motionMode === "nbody") {
       this.computeGravity();
 
       const accel = this.netForce.div(this.mass);
-      this.realVelocity = this.realVelocity.add(
-        accel.mul(dt)
-      );
+      nextVelocity = this.realVelocity.add(accel.mul(dt));
+      nextPosition = this.realPosition.add(nextVelocity.mul(dt));
 
-      super.update(dt);
-      return;
+      if (this.groundedOn && this.groundedNormal) {
+        const outwardForce = this.netForce.dot(this.groundedNormal);
+        if (outwardForce <= 0) {
+          nextVelocity = new Vector2D(0, 0, true);
+          nextPosition = this.realPosition;
+        } else {
+          this.groundedOn = null;
+          this.groundedNormal = null;
+        }
+      }
+    } else {
+      nextPosition = this.realPosition.add(this.realVelocity.mul(dt));
     }
 
-    // Fallback: if an unknown mode slips through, drift at current velocity
-    super.update(dt);
+    const { position, velocity, groundedOn, groundedNormal } = this.resolveCollisions(nextPosition, nextVelocity);
+    this.realPosition = position;
+    this.realVelocity = velocity;
+    this.groundedOn = groundedOn;
+    this.groundedNormal = groundedNormal;
   }
 }
