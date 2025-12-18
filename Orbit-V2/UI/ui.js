@@ -204,6 +204,12 @@ export function initUI(initialData = {}) {
       });
     };
 
+    const ensureVisibleIfWarped = () => {
+      if (_timeScale > 1) {
+        warpButtons.classList.add("visible");
+      }
+    };
+
     const renderButtons = () => {
       warpButtons.innerHTML = "";
 
@@ -254,6 +260,7 @@ export function initUI(initialData = {}) {
           }
 
           updateActiveButtons();
+          ensureVisibleIfWarped();
         });
 
         warpButtons.appendChild(btn);
@@ -262,9 +269,30 @@ export function initUI(initialData = {}) {
     };
 
     renderButtons();
+    ensureVisibleIfWarped();
+
+    // allow programmatic warp changes (keyboard shortcuts, etc.)
+    initUI._setTimeScale = (value) => {
+      const numeric = Math.max(1, Number(value) || 1);
+      _timeScale = numeric;
+
+      updateModeState();
+      updateActiveButtons();
+
+      if (_timeScale > 1) {
+        warpButtons.classList.add("visible");
+      } else {
+        warpButtons.classList.remove("visible");
+        _warpMode = "physics";
+      }
+    };
 
     const showWarp = () => warpButtons.classList.add("visible");
-    const hideWarp = () => warpButtons.classList.remove("visible");
+    const hideWarp = () => {
+      if (_timeScale === 1) {
+        warpButtons.classList.remove("visible");
+      }
+    };
 
     // hover behavior
     timePanel.addEventListener("mouseenter", showWarp);
@@ -276,12 +304,13 @@ export function initUI(initialData = {}) {
     timePanel.addEventListener("click", (e) => {
       // don't toggle when clicking a warp button itself
       if (e.target && e.target.closest && e.target.closest("#warpButtons")) return;
-      warpButtons.classList.toggle("visible");
+      warpButtons.classList.add("visible");
     });
 
     // clicking anywhere else closes it
     document.addEventListener("click", (e) => {
       if (!warpButtons.classList.contains("visible")) return;
+      if (_timeScale > 1) return;
       const inside = e.target && e.target.closest && e.target.closest("#timePanel");
       if (!inside) hideWarp();
     });
@@ -409,11 +438,11 @@ export function initUI(initialData = {}) {
         navCtx.stroke();
       }
 
-      // Edge markers
-      drawEdgeMarker(navState.prograde - navState.heading, "#facc15"); // Prograde
-      drawEdgeMarker(navState.prograde - navState.heading + Math.PI, "#f87272"); // Retrograde
-      drawEdgeMarker(navState.radialOut - navState.heading, "#22d3ee"); // Radial Out
-      drawEdgeMarker(navState.radialOut - navState.heading + Math.PI, "#e879f9"); // Radial In
+      // Edge markers (absolute ship-relative vectors; do not subtract heading)
+      drawEdgeMarker(navState.prograde, "#facc15"); // Prograde
+      drawEdgeMarker(navState.prograde + Math.PI, "#f87272"); // Retrograde
+      drawEdgeMarker(navState.radialOut, "#22d3ee"); // Radial Out
+      drawEdgeMarker(navState.radialOut + Math.PI, "#e879f9"); // Radial In
 
       // Heading triangle + center dot
       drawHeadingTriangle(navState.heading);
@@ -444,12 +473,29 @@ export function initUI(initialData = {}) {
     btn.addEventListener("click", () => btn.classList.toggle("active"));
   });
 
+  const attitudeModes = {
+    prograde: "prograde",
+    retrograde: "retrograde",
+    "radial out": "radialOut",
+    "radial in": "radialIn",
+  };
+
+  const dispatchAttitudeMode = (mode) => {
+    document.dispatchEvent(
+      new CustomEvent("attitude-mode", { detail: { mode: mode || null } })
+    );
+  };
+
   markerButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
       if (btn.dataset.disabled === "true") return;
+      const label = (btn.nextElementSibling?.textContent || "").trim().toLowerCase();
+      const mode = attitudeModes[label] || null;
       const alreadyActive = btn.classList.contains("active");
       markerButtons.forEach((b) => b.classList.remove("active"));
       if (!alreadyActive) btn.classList.add("active");
+      const nextMode = alreadyActive ? null : mode;
+      dispatchAttitudeMode(nextMode);
     });
   });
 
@@ -606,6 +652,14 @@ export function initUI(initialData = {}) {
     setData,
     getData: () => ({ ..._uiState }),
     getScales: getScaleValues,
+    setTimeScale: (value) => {
+      if (typeof initUI._setTimeScale === "function") {
+        initUI._setTimeScale(value);
+      } else {
+        _timeScale = Math.max(1, Number(value) || 1);
+        _warpMode = _timeScale === 1 ? "physics" : _warpMode;
+      }
+    },
     openPause,
     closePause,
     togglePause,

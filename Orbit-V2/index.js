@@ -1,12 +1,25 @@
-import { Earth } from "./Earth.js";
 import { Ship } from "./ship.js";
-import { Moon } from "./moon.js";
-import { view, resizeCanvasToWindow, attachPanZoom } from "./geometry.js";
-import { initUI, getTimeScale, getWarpMode, addSimTime } from "./ui.js";
-
-const METERS_PER_KM = 1000;
-const STANDARD_GRAVITY = 9.80665;
-const RAD_TO_DEG = 180 / Math.PI;
+import { G } from "./object.js";
+import { Sun } from "./Sun.js";
+import { Mercury } from "./Mercury.js";
+import { Venus } from "./Venus.js";
+import { Earth } from "./Earth.js";
+import { Moon } from "./Moon.js";
+import { Mars } from "./Mars.js";
+import { Jupiter } from "./Jupiter.js";
+import { Saturn } from "./Saturn.js";
+import { Uranus } from "./Uranus.js";
+import { Neptune } from "./Neptune.js";
+import {
+  view,
+  resizeCanvasToWindow,
+  attachPanZoom,
+  kmToPixels,
+  Vector2D,
+} from "./geometry.js";
+import { initUI, getTimeScale, getWarpMode, addSimTime } from "./UI/ui.js";
+import { collectTelemetry, METERS_PER_KM } from "./UI/format.js";
+import { initContextMenu } from "./UI/contextMenu.js";
 
 // ------------------------------------------------------
 // Canvas setup
@@ -33,14 +46,31 @@ const ui = initUI();
 // World setup
 // ------------------------------------------------------
 
-const earth = new Earth();
 const ship = new Ship();
-const moon = new Moon();
+const sun = new Sun();
+const mercury = new Mercury(sun);
+const venus = new Venus(sun);
+const earth = new Earth(sun);
+const moon = new Moon(earth);
+const mars = new Mars(sun);
+const jupiter = new Jupiter(sun);
+const saturn = new Saturn(sun);
+const uranus = new Uranus(sun);
+const neptune = new Neptune(sun);
 
-// Center camera on Earth
+const planets = [mercury, venus, earth, mars, jupiter, saturn, uranus, neptune];
+const pickableBodies = [sun, ...planets, moon, ship];
+
+let selectedBody = ship;
+let cameraTarget = earth;
+let lastCameraTargetPos = null;
+
+// Center camera on Earth to start
 view.panX = canvas.width / 2;
 view.panY = canvas.height / 2;
-
+view.zoom = 0.002;
+centerCameraOnBody(earth);
+lastCameraTargetPos = { x: earth.realPosition.x, y: earth.realPosition.y };
 
 // ------------------------------------------------------
 // Time
@@ -48,126 +78,114 @@ view.panY = canvas.height / 2;
 
 let lastTime = performance.now();
 
-// Initialize trajectory before the loop starts
-ship.computeTrajectory();
+// Place ship on Earth's surface (resting, no initial velocity relative to Earth)
+if (earth) {
+  const surfaceOffset = new Vector2D(earth.realRadius + ship.realRadius, 0, true);
+  ship.realPosition = earth.realPosition.add(surfaceOffset);
+  ship.realVelocity = earth.realVelocity.clone();
+  ship.groundedOn = earth;
+  ship.groundedNormal = surfaceOffset.normalize();
+}
+
+// Prime trajectories for orbiters
+planets.forEach((p) => p.computeTrajectory());
 moon.computeTrajectory();
+ship.computeTrajectory();
 
 // ------------------------------------------------------
-// Formatting helpers
+// Camera helpers
 // ------------------------------------------------------
+function centerCameraOnBody(body) {
+  if (!body) return;
+  const width = canvas.width;
+  const height = canvas.height;
+  const bodyXWorld = kmToPixels(body.realPosition.x / METERS_PER_KM);
+  const bodyYWorld = kmToPixels(body.realPosition.y / METERS_PER_KM);
 
-function formatDistance(meters) {
-  if (!Number.isFinite(meters)) return "--";
-  const abs = Math.abs(meters);
-  if (abs >= 1e9) return `${(meters / 1e9).toFixed(2)} Gm`;
-  if (abs >= 1e6) return `${(meters / 1e6).toFixed(2)} Mm`;
-  if (abs >= 1e3) return `${(meters / 1e3).toFixed(1)} km`;
-  return `${meters.toFixed(0)} m`;
+  view.panX = width / 2 - bodyXWorld * view.zoom;
+  view.panY = height / 2 - bodyYWorld * view.zoom;
 }
 
-function formatVelocity(mps) {
-  return Number.isFinite(mps) ? `${mps.toFixed(0)} m/s` : "--";
-}
-
-function formatDuration(seconds) {
-  if (!Number.isFinite(seconds)) return "--";
-  const sign = seconds < 0 ? "-" : "";
-  let t = Math.abs(seconds);
-  const hours = Math.floor(t / 3600);
-  t -= hours * 3600;
-  const minutes = Math.floor(t / 60);
-  t -= minutes * 60;
-  const secs = Math.floor(t);
-  if (hours > 0) return `${sign}${hours}:${minutes}:${secs}`;
-  if (minutes > 0) return `${sign}${minutes}:${secs}`;
-  return `${sign}${secs}s`;
-}
-
-const toDegrees = (rad) => rad * RAD_TO_DEG;
-
-function formatHeading(degrees) {
-  if (!Number.isFinite(degrees)) return "--";
-  const normalized = ((degrees % 360) + 360) % 360;
-  return `${normalized.toFixed(0).padStart(3, "0")} \u00B0`;
-}
-
-function buildOrbitalReadouts(trajectory, parent) {
-  const empty = {
-    apoapsis: "--",
-    timeToAp: "--",
-    periapsis: "--",
-    timeToPe: "--",
-    eccentricity: "--",
-    period: "--",
-    semiMajorAxis: "--",
-    argumentOfPeriapsis: "--",
-  };
-
-  if (!trajectory || !trajectory.valid || !parent) {
-    return empty;
+function setCameraTarget(body) {
+  cameraTarget = body;
+  lastCameraTargetPos = body
+    ? { x: body.realPosition.x, y: body.realPosition.y }
+    : null;
+  if (body) {
+    centerCameraOnBody(body);
   }
+}
 
-  const { a, e, omega, mu } = trajectory;
-  const parentRadiusMeters = parent.realRadius * METERS_PER_KM;
+function applyCameraFollow() {
+  if (!cameraTarget || !lastCameraTargetPos) return;
 
-  const apoapsis = a * (1 + e) - parentRadiusMeters;
-  const periapsis = a * (1 - e) - parentRadiusMeters;
-  const period = e < 1 ? 2 * Math.PI * Math.sqrt(Math.abs(a ** 3) / mu) : NaN;
+  const dxMeters = cameraTarget.realPosition.x - lastCameraTargetPos.x;
+  const dyMeters = cameraTarget.realPosition.y - lastCameraTargetPos.y;
 
-  return {
-    ...empty,
-    apoapsis: formatDistance(apoapsis),
-    periapsis: formatDistance(periapsis),
-    eccentricity: Number.isFinite(e) ? e.toFixed(3) : "--",
-    period: Number.isFinite(period) ? formatDuration(period) : "--",
-    semiMajorAxis: formatDistance(a),
-    argumentOfPeriapsis: Number.isFinite(omega) ? `${toDegrees(omega).toFixed(1)} \u00B0` : "--",
+  const dxWorld = kmToPixels(dxMeters / METERS_PER_KM);
+  const dyWorld = kmToPixels(dyMeters / METERS_PER_KM);
+
+  view.panX -= dxWorld * view.zoom;
+  view.panY -= dyWorld * view.zoom;
+
+  lastCameraTargetPos = {
+    x: cameraTarget.realPosition.x,
+    y: cameraTarget.realPosition.y,
   };
 }
 
-function collectTelemetry() {
-  const parent = ship.parent ?? earth;
-  const relativePos = parent ? ship.realPosition.sub(parent.realPosition) : ship.realPosition;
-  const altitudeMeters = parent
-    ? relativePos.mag() - parent.realRadius * METERS_PER_KM
-    : relativePos.mag();
-
-  const speed = ship.realVelocity.mag();
-  const accelMs2 = ship.netForce?.mag ? ship.netForce.mag() / ship.mass : 0;
-  const headingRad = Math.atan2(ship.realVelocity.y, ship.realVelocity.x);
-
-  const orbital = buildOrbitalReadouts(ship.trajectory, parent);
-
-  return {
-    ...orbital,
-    altitude: formatDistance(altitudeMeters),
-    velocity: formatVelocity(speed),
-    accel: Number.isFinite(accelMs2) ? `${(accelMs2 / STANDARD_GRAVITY).toFixed(2)} g` : "--",
-    heading: formatHeading(toDegrees(headingRad)),
-    headingRad,
-    thrustPct: 0,
-
-    // Targeting (placeholder values for now)
-    targetRelVel: "--",
-    targetSeparation: "--",
-    targetClosest: "--",
-    targetTimeCA: "--",
-
-    // Body info
-    bodySelected: parent?.name || "Earth",
-    bodyMass: parent?.mass ? `${parent.mass.toExponential(2)} kg` : "--",
-    bodySituation: ship.motionMode === "kepler" ? "On rails" : "Simulated",
-    bodySOI: parent?.name || "--",
-    bodyLockedOn: ship.motionMode === "kepler" ? "No" : "Yes",
-
-    // Maneuver (placeholders)
-    manDeltaV: "--",
-    manDuration: "--",
-    manBurnStart: "--",
-    manTWR: "--",
-    manHeading: "--",
-  };
+function ensureTrajectory(body) {
+  if (!body || body.sBody || body.motionMode !== "kepler") return;
+  if (!body.trajectory || !body.parent) {
+    body.computeTrajectory();
+  }
 }
+
+// ------------------------------------------------------
+// Context menu wiring
+// ------------------------------------------------------
+
+initContextMenu({
+  canvas,
+  view,
+  pickableBodies,
+  onSelect: (body) => {
+    selectedBody = body;
+    ensureTrajectory(selectedBody);
+    ui.setData(
+      collectTelemetry(selectedBody, {
+        defaultBody: ship,
+        fallbackParent: sun,
+        cameraTarget,
+        ensureTrajectory,
+      })
+    );
+  },
+  onFocus: (body) => {
+    setCameraTarget(body);
+  },
+  onTarget: () => {
+    // placeholder
+  },
+});
+
+// ------------------------------------------------------
+// Keyboard shortcuts
+// ------------------------------------------------------
+
+window.addEventListener("keydown", (e) => {
+  if (e.key === "c" || e.key === "C") {
+    ui?.setTimeScale?.(1);
+  }
+});
+
+// Attitude hold (legend buttons)
+document.addEventListener("attitude-mode", (e) => {
+  const mode = e.detail?.mode || null;
+  if (typeof ship.setAutopilotMode === "function") {
+    ship.setAutopilotMode(mode);
+  }
+});
 
 // ------------------------------------------------------
 // Main loop
@@ -181,22 +199,32 @@ function loop(now) {
   const warpMode = getWarpMode();
   const simDt = dt * scale;
 
-  addSimTime(simDt);
+addSimTime(simDt);
+
+sun.update(simDt);
+planets.forEach((p) => p.update(simDt));
+moon.update(simDt);
+ship.update(simDt, warpMode);
+applyCameraFollow();
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   ctx.setTransform(view.zoom, 0, 0, view.zoom, view.panX, view.panY);
 
-  earth.draw(ctx);
+sun.draw(ctx);
+planets.forEach((p) => p.draw(ctx));
+moon.draw(ctx);
+ship.draw(ctx);
 
-  moon.update(simDt);
-  moon.draw(ctx);
-
-  ship.update(simDt, warpMode);
-  ship.draw(ctx);
-
-  ui.setData(collectTelemetry());
+  ui.setData(
+    collectTelemetry(selectedBody, {
+      defaultBody: ship,
+      fallbackParent: sun,
+      cameraTarget,
+      ensureTrajectory,
+    })
+  );
 
   requestAnimationFrame(loop);
 }

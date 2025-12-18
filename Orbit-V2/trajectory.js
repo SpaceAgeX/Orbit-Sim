@@ -296,4 +296,43 @@ export class Trajectory {
       velocity: this.body.realVelocity.clone(),
     };
   }
+
+  getTimeToApsides(t = 0) {
+    if (!this.valid || this.e >= 1) {
+      return { timeToPe: null, timeToAp: null };
+    }
+
+    const TWO_PI = 2 * Math.PI;
+
+    const n = this.n;
+    const nAbs = Math.abs(n);
+    if (!Number.isFinite(nAbs) || nAbs === 0) {
+      return { timeToPe: null, timeToAp: null };
+    }
+
+    // current mean anomaly (normalized)
+    const M = normalizeAngle(this.M0 + n * t);
+
+    // targets
+    const Mpe = 0;        // periapsis
+    const Map = Math.PI;  // apoapsis
+
+    // If n < 0, M decreases with time, so "forward in time" wraps the other way.
+    const deltaForward = (target) => {
+      if (n >= 0) {
+        return (target - M + TWO_PI) % TWO_PI;
+      }
+      return (M - target + TWO_PI) % TWO_PI;
+    };
+
+    const dMpe = deltaForward(Mpe);
+    const dMap = deltaForward(Map);
+
+    return {
+      timeToPe: dMpe / nAbs,
+      timeToAp: dMap / nAbs,
+    };
+  }
+
+
 }
