@@ -1,183 +1,159 @@
 # Orbital Mechanics Simulator
 
-A browser-based 2D orbital simulation using Newtonian gravity.  
-The system models Earth, the Moon, and a satellite with real orbital mechanics, a dynamic camera, and UI panels displaying simulation time, orbital parameters, and settings.
+A browser-based 2D Earth-Moon orbital simulator built with vanilla JavaScript and HTML5 canvas.
 
----
+The current build includes:
+
+- Earth as the central body
+- The Moon orbiting Earth
+- A controllable ship starting at Earth's surface
+- Two time warp modes
+- Camera focus, targeting, and orbital readouts
+
 ## Controls
 
-### Mouse Input
+### Mouse
 
 | Action | Input |
-|--------|-------|
-| Select body | Left click |
-| Open context menu (selection or camera target) | Right click |
-| Pan camera | Left-click + drag |
+|---|---|
+| Pan camera | Left click + drag |
 | Zoom | Mouse wheel |
+| Open body context menu | Right click on Earth, Moon, or Ship |
 
----
+Notes:
 
-### Keyboard — Camera
+- Mouse-wheel zoom is centered on the screen, not the cursor.
+- The ship has an enlarged click radius so it is easier to right-click.
+
+### Keyboard
 
 | Action | Input |
-|--------|-------|
-| Zoom in | Arrow Up |
-| Zoom out | Arrow Down |
-| Rotate Left | A |
-| Rotate Right | D |
-| Throttle Up | Shift |
-| Throttle Down | Ctrl |
-| Increase Max Thrust | R |
-| Decrease Max Thrust | F |
+|---|---|
+| Rotate ship left | `A` |
+| Rotate ship right | `D` |
+| Throttle up | `Shift` |
+| Throttle down | `Ctrl` |
+| Cut throttle to 0% | `X` |
+| Set throttle to 100% | `Z` |
+| Zoom in | `Arrow Up` |
+| Zoom out | `Arrow Down` |
+| Reset time warp to `1x` | `C` |
+| Open / close pause menu | `Esc` |
 
+### Context Menu
 
----
+Right-clicking a body opens:
 
-### Time Warp
+- `Select Body`
+- `Set Camera Focus`
+- `Set Target`
 
-Time warp values are selected via UI buttons.
+These work on the ship as well as Earth and Moon.
 
-Keyboard shortcut:
+## Running
 
-- C resets simulation to 1×.
+Serve the project from the repo root:
 
----
+```powershell
+cd c:\Users\X\Documents\Programs\WebDev\Orbit
+python -m http.server 8000
+```
 
-### UI Toggles
+Then open:
 
-Located in the Settings panel:
+`http://localhost:8000`
 
-- Orbit path display toggle
+## Time Warp
 
----
+The clock panel supports two warp systems:
 
-### Context Menu Options
+### Physics Warp
 
-Accessible by right-clicking a body:
+- Uses full Newtonian gravity
+- Updates all active bodies with n-body physics
+- Ship controls and thrust are enabled in this mode
+- Available warp steps: `1x`, `2x`, `3x`, `5x`, `8x`, `10x`, `12x`, `15x`, `20x`
 
-- Select Body
-- Set Camera Target
+### Fixed Warp
 
-These update UI information and camera behavior dynamically.
+- Uses Kepler-style orbital rails
+- Each moving body follows the single body exerting the strongest gravitational influence
+- Intended for faster stable orbital time acceleration
+- Available warp steps: `1x`, `5x`, `10x`, `50x`, `100x`, `1000x`, `10000x`, `100000x`
 
----
+Notes:
 
-## Visual Assets
+- The warp tray is attached to the clock UI.
+- Clicking the mode button switches between `Physics` and `Fixed`.
+- Pressing `C` returns warp to `1x`.
 
-Earth and Moon artwork sourced from:
-
-PixelPlanets — https://github.com/Deep-Fold/PixelPlanets  
-(Refer to their repository for licensing information)
-
----
-
-## Technology
-
-Built using:
-
-- Vanilla JavaScript
-- HTML5 Canvas
-
-All physics are implemented manually without external simulation libraries.
-
----
-
-## Features
-
-### Real Newtonian Gravity
-
-All bodies interact gravitationally using the universal gravitational constant.  
-Physics integration is implemented in `rigidBody.js`, including:
-
-- Force accumulation
-- Velocity and position updates
-- Orbital parameter calculations:
-  - Semi-major axis
-  - Eccentricity
-  - Periapsis and apoapsis
-  - Orbital period
-
----
-
-### Earth–Moon System
-
-Defined in `index.js` using scaled real-world values.  
-The Moon dynamically computes its orbital elements and draws its orbit path, implemented in `moon.js`.
-
----
-
-### Satellite
-
-A fully simulated satellite orbiting Earth, using the same gravitational physics and orbital calculations.  
-Selectable via mouse input.  
-Defined in `satellite.js`.
-
----
-
-### Camera System
-
-Implemented in `geometry.js` and supports:
-
-- Panning
-- Zooming
-- Target tracking
-
-The camera can lock onto a body and follow its motion to keep it centered.
-
----
-
-## UI Panels (UI.js)
-
-The interface includes multiple panels:
-
----
+## UI
 
 ### Time Panel
 
-- Displays simulation clock (years, days, hours, minutes, seconds)
-- Time warp controls (1× to 10,000×)
-- Smooth expansion on hover
+- Simulation clock
+- Warp mode toggle
+- Warp speed buttons
 
----
+### Orbital Data
 
-### Orbit Information Panel
+Shows values for the selected body, including:
 
-Shows live orbital data for the selected body:
-
-- Speed
-- Altitude
 - Apoapsis
 - Periapsis
-- Semi-major axis
+- Time to apoapsis
+- Time to periapsis
 - Eccentricity
-- Orbital period
+- Period
+- Semi-major axis
+- Argument of periapsis
 
----
+### Body Status
 
-### Body Information Panel
-
-Displays:
+Shows:
 
 - Selected body
-- Locked camera target
-- Parent body
-- Object mass
+- Mass
+- Situation
+- Sphere of influence / parent body
+- Current camera focus
 
----
+### Target Data
 
-### General Settings
+Shows target-relative readouts when a target is set:
 
-Includes options to:
+- Relative velocity
+- Separation
 
-- Toggle orbit path visibility
-- Toggle true-size rendering
-- Display km-per-pixel scale
+### Nav / Flight UI
 
----
+- Velocity
+- Heading
+- Acceleration
+- Throttle bar
+- Navball
+- Attitude hold buttons
 
+## Visual Behavior
+
+- The Moon starts to the right of Earth and orbits counterclockwise.
+- The ship draws a highlighted orbital path.
+- When zoomed far enough out, the ship displays a visibility indicator so it remains easy to find.
+
+## Project Structure
+
+- [main.js](/c:/Users/X/Documents/Programs/WebDev/Orbit/main.js): app entry, world setup, main loop
+- [geometry.js](/c:/Users/X/Documents/Programs/WebDev/Orbit/geometry.js): camera, zoom, coordinate helpers
+- [object.js](/c:/Users/X/Documents/Programs/WebDev/Orbit/object.js): body state, gravity, Kepler/n-body switching
+- [ship.js](/c:/Users/X/Documents/Programs/WebDev/Orbit/ship.js): ship controls, drawing, trajectory rendering
+- [planetBase.js](/c:/Users/X/Documents/Programs/WebDev/Orbit/planetBase.js): sprite body base class
+- [UI/ui.js](/c:/Users/X/Documents/Programs/WebDev/Orbit/UI/ui.js): HUD, warp controls, pause/settings UI
+- [UI/contextMenu.js](/c:/Users/X/Documents/Programs/WebDev/Orbit/UI/contextMenu.js): right-click body menu
+- [UI/format.js](/c:/Users/X/Documents/Programs/WebDev/Orbit/UI/format.js): telemetry formatting
 
 ## Assets
 
 Earth and Moon pixel art provided by:
 
-PixelPlanets — https://github.com/Deep-Fold/PixelPlanets
+PixelPlanets  
+https://github.com/Deep-Fold/PixelPlanets
