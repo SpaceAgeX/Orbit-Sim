@@ -1,6 +1,7 @@
 import { Ship } from "./ship.js";
 import { Earth } from "./Earth.js";
 import { Moon } from "./moon.js";
+import { circularVelocity } from "./planetBase.js";
 import {
   view,
   resizeCanvasToWindow,
@@ -11,10 +12,6 @@ import {
 import { initUI, getTimeScale, getWarpMode, addSimTime } from "./UI/ui.js";
 import { collectTelemetry, METERS_PER_KM } from "./UI/format.js";
 import { initContextMenu } from "./UI/contextMenu.js";
-
-// ------------------------------------------------------
-// Canvas setup
-// ------------------------------------------------------
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d", { alpha: false });
@@ -27,55 +24,41 @@ onResize();
 
 attachPanZoom(canvas);
 
-// ------------------------------------------------------
-// UI initialization
-// ------------------------------------------------------
-
 const ui = initUI();
-
-// ------------------------------------------------------
-// World setup
-// ------------------------------------------------------
 
 const ship = new Ship();
 const earth = new Earth();
 const moon = new Moon(earth);
+const moonOrbitRadius = 384_400_000;
+const moonOrbitSpeed = circularVelocity(earth.mass, moonOrbitRadius);
 
 const pickableBodies = [earth, moon, ship];
 
 let selectedBody = ship;
 let cameraTarget = earth;
+let targetBody = null;
 let lastCameraTargetPos = null;
 
-// Center camera on Earth to start
 view.panX = canvas.width / 2;
 view.panY = canvas.height / 2;
 view.zoom = 0.08;
 centerCameraOnBody(earth);
 lastCameraTargetPos = { x: earth.realPosition.x, y: earth.realPosition.y };
 
-// ------------------------------------------------------
-// Time
-// ------------------------------------------------------
-
 let lastTime = performance.now();
 
-// Place ship on Earth's surface (resting, no initial velocity relative to Earth)
-if (earth) {
-  const surfaceOffset = new Vector2D(earth.realRadius + ship.realRadius, 0, true);
-  ship.realPosition = earth.realPosition.add(surfaceOffset);
-  ship.realVelocity = earth.realVelocity.clone();
-  ship.groundedOn = earth;
-  ship.groundedNormal = surfaceOffset.normalize();
-}
+const surfaceOffset = new Vector2D(earth.realRadius + ship.realRadius, 0, true);
+ship.realPosition = earth.realPosition.add(surfaceOffset);
+ship.realVelocity = earth.realVelocity.clone();
+ship.groundedOn = earth;
+ship.groundedNormal = surfaceOffset.normalize();
 
-// Prime trajectories for orbiters
+moon.realPosition = earth.realPosition.add(new Vector2D(moonOrbitRadius, 0, true));
+moon.realVelocity = earth.realVelocity.add(new Vector2D(0, -moonOrbitSpeed, true));
+
 moon.computeTrajectory();
 ship.computeTrajectory();
 
-// ------------------------------------------------------
-// Camera helpers
-// ------------------------------------------------------
 function centerCameraOnBody(body) {
   if (!body) return;
   const width = canvas.width;
@@ -135,10 +118,6 @@ function syncBodyWarpMode(body, warpMode, dt) {
   }
 }
 
-// ------------------------------------------------------
-// Context menu wiring
-// ------------------------------------------------------
-
 initContextMenu({
   canvas,
   view,
@@ -151,6 +130,7 @@ initContextMenu({
         defaultBody: ship,
         fallbackParent: earth,
         cameraTarget,
+        targetBody,
         ensureTrajectory,
       })
     );
@@ -158,32 +138,32 @@ initContextMenu({
   onFocus: (body) => {
     setCameraTarget(body);
   },
-  onTarget: () => {
-    // placeholder
+  onTarget: (body) => {
+    targetBody = body || null;
+    ui.setData(
+      collectTelemetry(selectedBody, {
+        defaultBody: ship,
+        fallbackParent: earth,
+        cameraTarget,
+        targetBody,
+        ensureTrajectory,
+      })
+    );
   },
 });
 
-// ------------------------------------------------------
-// Keyboard shortcuts
-// ------------------------------------------------------
-
-window.addEventListener("keydown", (e) => {
-  if (e.key === "c" || e.key === "C") {
+window.addEventListener("keydown", (event) => {
+  if (event.key === "c" || event.key === "C") {
     ui?.setTimeScale?.(1);
   }
 });
 
-// Attitude hold (legend buttons)
-document.addEventListener("attitude-mode", (e) => {
-  const mode = e.detail?.mode || null;
+document.addEventListener("attitude-mode", (event) => {
+  const mode = event.detail?.mode || null;
   if (typeof ship.setAutopilotMode === "function") {
     ship.setAutopilotMode(mode);
   }
 });
-
-// ------------------------------------------------------
-// Main loop
-// ------------------------------------------------------
 
 function loop(now) {
   const dt = Math.min(0.05, (now - lastTime) / 1000);
@@ -212,12 +192,13 @@ function loop(now) {
   ship.draw(ctx);
 
   ui.setData(
-      collectTelemetry(selectedBody, {
-        defaultBody: ship,
-        fallbackParent: earth,
-        cameraTarget,
-        ensureTrajectory,
-      })
+    collectTelemetry(selectedBody, {
+      defaultBody: ship,
+      fallbackParent: earth,
+      cameraTarget,
+      targetBody,
+      ensureTrajectory,
+    })
   );
 
   requestAnimationFrame(loop);
