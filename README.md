@@ -4,6 +4,63 @@ A browser-based 2D orbital simulation using Newtonian gravity.
 The system models Earth, the Moon, and a satellite with real orbital mechanics, a dynamic camera, and UI panels displaying simulation time, orbital parameters, and settings.
 
 ---
+## Controls
+
+### Mouse Input
+
+| Action | Input |
+|--------|-------|
+| Select body | Left click |
+| Open context menu (selection or camera target) | Right click |
+| Pan camera | Left-click + drag |
+| Zoom | Mouse wheel |
+
+---
+
+### Keyboard — Camera
+
+| Action | Input |
+|--------|-------|
+| Zoom in | Arrow Up |
+| Zoom out | Arrow Down |
+| Rotate Left | A |
+| Rotate Right | D |
+| Throttle Up | Shift |
+| Throttle Down | Ctrl |
+| Increase Max Thrust | R |
+| Decrease Max Thrust | F |
+
+
+---
+
+### Time Warp
+
+Time warp values are selected via UI buttons.
+
+Keyboard shortcut:
+
+- C resets simulation to 1×.
+
+---
+
+### UI Toggles
+
+Located in the Settings panel:
+
+- Orbit path display toggle
+
+---
+
+### Context Menu Options
+
+Accessible by right-clicking a body:
+
+- Select Body
+- Set Camera Target
+
+These update UI information and camera behavior dynamically.
+
+---
 
 ## Visual Assets
 
@@ -118,81 +175,6 @@ Includes options to:
 
 ---
 
-## Controls
-
-### Mouse Input
-
-| Action | Input |
-|--------|-------|
-| Select body | Left click |
-| Open context menu (selection or camera target) | Right click |
-| Pan camera | Left-click + drag |
-| Zoom | Mouse wheel |
-
----
-
-### Keyboard — Camera
-
-| Action | Input |
-|--------|-------|
-| Zoom in | Arrow Up |
-| Zoom out | Arrow Down |
-| Rotate Left | A |
-| Rotate Right | D |
-| Throttle Up | Shift |
-| Throttle Down | Ctrl |
-| Increase Max Thrust | R |
-| Decrease Max Thrust | F |
-
-
----
-
-### Time Warp
-
-Time warp values are selected via UI buttons.
-
-Keyboard shortcut:
-
-- C resets simulation to 1×.
-
----
-
-### UI Toggles
-
-Located in the Settings panel:
-
-- Orbit path display toggle
-
----
-
-### Context Menu Options
-
-Accessible by right-clicking a body:
-
-- Select Body
-- Set Camera Target
-
-These update UI information and camera behavior dynamically.
-
----
-
-## Project Structure
-
-index.html – Canvas and UI layout
-style.css – UI styling and layout
-index.js – Simulation setup, main loop, rendering
-geometry.js – Camera transforms, scaling utilities
-rigidBody.js – Core N-body physics engine and orbital math
-earth.js – Earth definition and drawing logic
-moon.js – Moon definition and orbit path rendering
-satellite.js – Satellite simulation and drawing
-UI.js – Time panel, settings, orbit information, menus
-input.js – Reserved for future input handling
-
-yaml
-Copy code
-
----
 
 ## Assets
 
