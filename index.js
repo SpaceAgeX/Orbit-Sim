@@ -1,5 +1,5 @@
 import { Ship } from "./ship.js";
-import { Earth } from "./Earth.js";
+import { Earth } from "./earth.js";
 import { Moon } from "./moon.js";
 import {
   view,
