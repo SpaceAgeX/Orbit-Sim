@@ -193,7 +193,7 @@ function loop(now) {
   syncBodyWarpMode(ship, warpMode, simDt);
 
   moon.update(simDt);
-  ship.update(simDt, warpMode);
+  ship.update(dt, simDt, warpMode);
   applyCameraFollow();
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);

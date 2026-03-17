@@ -125,7 +125,8 @@ export class Ship extends Body {
   }
 
   applyControls(dt, normalizedWarp) {
-    const controlsEnabled = normalizedWarp === "physics";
+    // Controls always enabled for consistent response speed
+    const controlsEnabled = true;
 
     if (!controlsEnabled) {
       this.thrustPercent = 0;
@@ -177,7 +178,7 @@ export class Ship extends Body {
     clearPressed();
   }
 
-  update(dt, warpMode) {
+  update(dt, simDt, warpMode) {
     const normalizedWarp = warpMode === "physics" || !warpMode ? "physics" : "fixed";
 
     // Always update trajectory when in physics mode so it's ready for switching
@@ -186,13 +187,13 @@ export class Ship extends Body {
     }
 
     if (normalizedWarp !== this.localMode) {
-      this.switchState(normalizedWarp, dt);
+      this.switchState(normalizedWarp, simDt);
       this.localMode = normalizedWarp;
     }
 
     this.applyControls(dt, normalizedWarp);
 
-    super.update(dt);
+    super.update(simDt);
   }
   
 

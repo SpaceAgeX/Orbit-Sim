@@ -67,7 +67,9 @@ html, body {
 #uiRoot .info-tab,
 #uiRoot .info-content,
 #uiRoot #contextMenu,
-#uiRoot #contextMenu * {
+#uiRoot #contextMenu *,
+#uiRoot #introModal,
+#uiRoot #introModal * {
   pointer-events: auto;
 }
 
@@ -967,4 +969,111 @@ body.paused {
   font-size: 0.75rem;
   color: #bbb;
   letter-spacing: 0.02em;
+}
+
+.intro-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  pointer-events: auto;
+}
+
+.intro-content {
+  background: rgba(15, 20, 30, 0.95);
+  border: 1px solid rgba(255, 208, 122, 0.35);
+  border-radius: 16px;
+  box-shadow:
+    0 0 20px rgba(0, 0, 0, 0.5),
+    0 0 40px rgba(255, 208, 122, 0.2);
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 0;
+  margin: 20px;
+}
+
+.intro-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(255, 208, 122, 0.2);
+  background: rgba(255, 208, 122, 0.05);
+  border-radius: 16px 16px 0 0;
+}
+
+.intro-header h2 {
+  color: #ffe082;
+  text-shadow:
+    0 0 8px rgba(255, 208, 122, 0.4),
+    0 0 16px rgba(255, 208, 122, 0.3);
+  margin: 0;
+}
+
+.icon-btn {
+  background: rgba(255, 208, 122, 0.1);
+  border: 1px solid rgba(255, 208, 122, 0.3);
+  color: #ffe082;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 120ms ease, transform 120ms ease;
+}
+
+.icon-btn:hover {
+  background: rgba(255, 208, 122, 0.2);
+  transform: scale(1.05);
+}
+
+.intro-body {
+  padding: 24px;
+  color: #ddd;
+  line-height: 1.6;
+}
+
+.intro-body h3 {
+  color: #ffe082;
+  margin-top: 20px;
+  margin-bottom: 10px;
+  font-size: 1.1rem;
+  text-shadow: 0 0 6px rgba(255, 208, 122, 0.3);
+}
+
+.intro-body h4 {
+  color: #ffe082;
+  margin-top: 16px;
+  margin-bottom: 8px;
+  font-size: 1rem;
+  text-shadow: 0 0 6px rgba(255, 208, 122, 0.3);
+}
+
+.intro-body p {
+  margin-bottom: 12px;
+}
+
+.intro-body ul {
+  margin: 8px 0 16px 20px;
+  padding: 0;
+}
+
+.intro-body li {
+  margin-bottom: 6px;
+}
+
+.intro-body strong {
+  color: #ffe082;
+  font-weight: 600;
+}
+
+.hidden {
+  display: none !important;
 }

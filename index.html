@@ -247,6 +247,62 @@
         </div>
       </div>
 
+    <!-- Intro/Welcome Modal -->
+    <div id="introModal" class="intro-modal hidden">
+      <div class="intro-content">
+        <div class="intro-header">
+          <h2 class="panel-title">Orbital Mechanics Simulator</h2>
+          <button id="introClose" class="icon-btn" aria-label="Close intro">x</button>
+        </div>
+        <div class="intro-body">
+          <p>A browser-based 2D Earth-Moon orbital simulator built with vanilla JavaScript and HTML5 canvas.</p>
+          <p>To Access These Instuctions Again Press Escape and go to Help and Controls</p>
+          <p>The current build includes:</p>
+          <ul>
+            <li>Earth as the central body</li>
+            <li>The Moon orbiting Earth</li>
+            <li>A controllable ship starting at Earth's surface</li>
+            <li>Two time warp modes</li>
+            <li>Camera focus, targeting, and orbital readouts</li>
+          </ul>
+          <h3>Controls</h3>
+          <h4>Mouse</h4>
+          <ul>
+            <li>Pan camera: Left click + drag</li>
+            <li>Zoom: Mouse wheel</li>
+            <li>Open body context menu: Right click on Earth, Moon, or Ship</li>
+          </ul>
+          <h4>Keyboard</h4>
+          <ul>
+            <li>Rotate ship left: A</li>
+            <li>Rotate ship right: D</li>
+            <li>Throttle up: Shift</li>
+            <li>Throttle down: Ctrl</li>
+            <li>Cut throttle to 0%: X</li>
+            <li>Set throttle to 100%: Z</li>
+            <li>Zoom in: Arrow Up</li>
+            <li>Zoom out: Arrow Down</li>
+            <li>Reset time warp to 1x: C</li>
+            <li>Open / close pause menu: Esc</li>
+          </ul>
+          <h4>Time Warp</h4>
+          <p>Hover over the clock in the top-left to reveal the warp controls. Click a button to change the simulation speed.</p>
+          <ul>
+            <li>Physics mode (default): realistic step-based warp while physics continues running.</li>
+            <li>Fixed mode: skips physics integration for faster jumps (best for fast-forwarding).</li>
+            <li>Use the toggle button to switch between modes; warp resets to 1x when switching.</li>
+          </ul>
+          <h4>Context Menu</h4>
+          <p>Right-clicking a body opens:</p>
+          <ul>
+            <li>Select Body</li>
+            <li>Set Camera Focus</li>
+            <li>Set Target</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
     <!-- Pause Overlay -->
     <div id="pauseOverlay">
       <div id="pauseWindow">
@@ -259,6 +315,7 @@
           <div class="menu-buttons" id="mainMenu">
             <button class="pause-btn" data-action="resume">Resume</button>
             <button class="pause-btn" data-open="settings">Settings</button>
+            <button class="pause-btn" id="helpBtn">Help & Controls</button>
             <button class="pause-btn" data-action="quit">Quit</button>
           </div>
           <div id="settingsPanel" class="hidden">
@@ -288,6 +345,7 @@
               <input type="range" id="infoScaleRange" min="50" max="150" step="1" value="100">
               <span class="setting-value" id="infoScaleValue">100%</span>
             </div>
+            
           </div>
         </div>
       </div>

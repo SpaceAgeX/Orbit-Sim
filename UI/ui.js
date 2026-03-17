@@ -597,6 +597,52 @@ export function initUI(initialData = {}) {
   backButton?.addEventListener("click", showMainMenu);
   quitButton?.addEventListener("click", closePause);
 
+  // Intro modal handling
+  const introModal = document.getElementById("introModal");
+  const introModalClose = document.getElementById("introClose");
+  const helpBtn = document.getElementById("helpBtn");
+
+  const showIntroModal = () => {
+    if (introModal) {
+      introModal.classList.remove("hidden");
+    }
+  };
+
+  const hideIntroModal = () => {
+    if (introModal) {
+      introModal.classList.add("hidden");
+    }
+  };
+
+  // Show intro modal on first load (if not previously shown)
+  const hasSeenIntro = (() => {
+    try {
+      return localStorage.getItem("orbitSimIntroShown");
+    } catch (e) {
+      return null; // localStorage not available
+    }
+  })();
+
+  if (!hasSeenIntro) {
+    showIntroModal();
+    try {
+      localStorage.setItem("orbitSimIntroShown", "true");
+    } catch (e) {
+      // localStorage not available, ignore
+    }
+  }
+
+  // Event listeners for modal
+  introModalClose?.addEventListener("click", hideIntroModal);
+  helpBtn?.addEventListener("click", showIntroModal);
+
+  // Close modal when clicking outside content
+  introModal?.addEventListener("click", (e) => {
+    if (e.target === introModal) {
+      hideIntroModal();
+    }
+  });
+
   // Field bindings (text content)
   const elementRefs = {};
   FIELD_DEFS.forEach((def) => {
