@@ -16,34 +16,48 @@ import { initContextMenu } from "./UI/contextMenu.js";
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d", { alpha: false });
 
+let selectedBody = null;
+let cameraTarget = null;
+
 function onResize() {
   resizeCanvasToWindow(canvas, ctx);
+  // Keep the camera centered on the active target after resizing
+  if (cameraTarget) {
+    centerCameraOnBody(cameraTarget);
+  }
 }
 window.addEventListener("resize", onResize);
-onResize();
+
+view.panX = canvas.width / 2;
+view.panY = canvas.height / 2;
+view.zoom = 0.1;
 
 attachPanZoom(canvas);
 
 const ui = initUI();
+ui.setCanvasRef(canvas);
 
 const ship = new Ship();
 const earth = new Earth();
 const moon = new Moon(earth);
+
+// Initial resize should happen after initial camera target is set
+onResize();
 const moonOrbitRadius = 384_400_000;
 const moonOrbitSpeed = circularVelocity(earth.mass, moonOrbitRadius);
 
 const pickableBodies = [earth, moon, ship];
 
-let selectedBody = ship;
-let cameraTarget = earth;
+selectedBody = ship;
+cameraTarget = ship;
 let targetBody = null;
 let lastCameraTargetPos = null;
 
-view.panX = canvas.width / 2;
-view.panY = canvas.height / 2;
-view.zoom = 0.08;
-centerCameraOnBody(earth);
+centerCameraOnBody(earth, { x: 50, y: 25 });
 lastCameraTargetPos = { x: earth.realPosition.x, y: earth.realPosition.y };
+
+// Ensure the slider matches initial zoom
+ui.updateScaleDisplay();
 
 let lastTime = performance.now();
 
@@ -59,15 +73,15 @@ moon.realVelocity = earth.realVelocity.add(new Vector2D(0, -moonOrbitSpeed, true
 moon.computeTrajectory();
 ship.computeTrajectory();
 
-function centerCameraOnBody(body) {
+function centerCameraOnBody(body, offset = { x: 0, y: 0 }) {
   if (!body) return;
   const width = canvas.width;
   const height = canvas.height;
   const bodyXWorld = kmToPixels(body.realPosition.x / METERS_PER_KM);
   const bodyYWorld = kmToPixels(body.realPosition.y / METERS_PER_KM);
 
-  view.panX = width / 2 - bodyXWorld * view.zoom;
-  view.panY = height / 2 - bodyYWorld * view.zoom;
+  view.panX = width / 2 - bodyXWorld * view.zoom + offset.x;
+  view.panY = height / 2 - bodyYWorld * view.zoom + offset.y;
 }
 
 function setCameraTarget(body) {
@@ -200,6 +214,9 @@ function loop(now) {
       ensureTrajectory,
     })
   );
+
+  // Update scale display
+  ui.updateScaleDisplay();
 
   requestAnimationFrame(loop);
 }

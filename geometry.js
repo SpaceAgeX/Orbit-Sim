@@ -120,9 +120,9 @@ export const KM_PER_PIXEL = 10;
 const METERS_PER_PIXEL = KM_PER_PIXEL * 1000;
 
 // View bounds (km-per-pixel based zoom limits)
-// Allow very large scales to see the full solar system
-export const MIN_KM_PER_PIXEL = 1;
-export const MAX_KM_PER_PIXEL = 10_000_000;
+// Earth-Moon system zoom: 10 km/px to 800 km/px
+export const MIN_KM_PER_PIXEL = 10;
+export const MAX_KM_PER_PIXEL = 800;
 
 export const MIN_ZOOM = KM_PER_PIXEL / MAX_KM_PER_PIXEL;
 export const MAX_ZOOM = KM_PER_PIXEL / MIN_KM_PER_PIXEL;
@@ -141,6 +141,26 @@ export function clamp(v, lo, hi) {
 
 export function effectiveKmPerPixel() {
   return KM_PER_PIXEL / view.zoom;
+}
+
+export function setZoom(newZoom) {
+  view.zoom = clamp(newZoom, MIN_ZOOM, MAX_ZOOM);
+}
+
+export function zoomTo(zoom, px, py) {
+  const targetZoom = clamp(zoom, MIN_ZOOM, MAX_ZOOM);
+  const worldX = (px - view.panX) / view.zoom;
+  const worldY = (py - view.panY) / view.zoom;
+
+  view.zoom = targetZoom;
+  view.panX = px - worldX * view.zoom;
+  view.panY = py - worldY * view.zoom;
+}
+
+export function zoomAtScreenCenter(canvas, zoomFactor) {
+  const centerX = canvas.clientWidth / 2;
+  const centerY = canvas.clientHeight / 2;
+  zoomAt(canvas, centerX, centerY, zoomFactor);
 }
 
 export function kmToPixels(km) {

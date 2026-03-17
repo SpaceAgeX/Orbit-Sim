@@ -1,6 +1,8 @@
 // /public/ui.js
 // UI module (single source of truth for UI state: time scale + sim clock + HUD setters)
 
+import { setZoom, view, MIN_ZOOM, MAX_ZOOM, effectiveKmPerPixel, zoomTo } from "../geometry.js";
+
 let _timeScale = 1;     // warp multiplier (1x, 5x, etc)
 let _warpMode = "physics"; // "physics" | "fixed"
 
@@ -9,6 +11,7 @@ let _simSeconds = 0;    // accumulated simulation time in seconds
 let _clockEls = null;   // cached DOM refs for clock
 let _uiApi = null;      // last initUI return (optional)
 let _uiState = {};      // latest HUD values pushed through setData
+let _canvas = null;     // canvas reference for zoom operations
 
 const FIELD_DEFS = [
   { key: "altitude", elementId: "altitudeValue", defaultValue: "0 m" },
@@ -645,6 +648,76 @@ export function initUI(initialData = {}) {
     info: Number(document.getElementById("infoScaleRange")?.value || 0),
   });
 
+  // ===========================
+  // SCALE/ZOOM PANEL HANDLER
+  // ===========================
+  const zoomSlider = document.getElementById("zoomSlider");
+  const scaleValue = document.getElementById("scaleValue");
+
+  const updateScaleDisplay = () => {
+    if (!scaleValue) return;
+    const kmPerPx = effectiveKmPerPixel();
+    // Format the display
+    let displayValue;
+    if (kmPerPx >= 1000) {
+      displayValue = (kmPerPx / 1000).toFixed(1);
+    } else if (kmPerPx >= 1) {
+      displayValue = kmPerPx.toFixed(1);
+    } else {
+      displayValue = kmPerPx.toFixed(3);
+    }
+    scaleValue.textContent = displayValue;
+  };
+
+  const zoomToSliderValue = (zoom) => {
+    // Convert zoom to 0-100 slider value
+    // LEFT (0) = MIN_ZOOM (zoomed out, see more)
+    // RIGHT (100) = MAX_ZOOM (zoomed in, see less)
+    const normalizedZoom = (zoom - MIN_ZOOM) / (MAX_ZOOM - MIN_ZOOM);
+    const sliderValue = normalizedZoom * 100;
+    return Math.max(0, Math.min(100, sliderValue));
+  };
+
+  const sliderValueToZoom = (sliderValue) => {
+    // Convert 0-100 slider value back to zoom
+    const normalizedZoom = sliderValue / 100;
+    const zoom = MIN_ZOOM + (normalizedZoom * (MAX_ZOOM - MIN_ZOOM));
+    return zoom;
+  };
+
+  if (zoomSlider) {
+    const syncSliderToZoom = () => {
+      const sliderValue = zoomToSliderValue(view.zoom);
+      zoomSlider.value = sliderValue;
+    };
+
+    syncSliderToZoom();
+    updateScaleDisplay();
+
+    zoomSlider.addEventListener("input", (e) => {
+      const newValue = Number(e.target.value);
+      const newZoom = sliderValueToZoom(newValue);
+
+      if (_canvas) {
+        // Use actual canvas pixels (not CSS pixels) so zooming stays centered
+        const centerX = _canvas.width / 2;
+        const centerY = _canvas.height / 2;
+        zoomTo(newZoom, centerX, centerY);
+      } else {
+        setZoom(newZoom);
+      }
+
+      syncSliderToZoom();
+      updateScaleDisplay();
+    });
+  }
+
+  // Export function for main loop to update scale display
+  initUI._updateScaleDisplay = updateScaleDisplay;
+  initUI._setCanvasRef = (canvas) => {
+    _canvas = canvas;
+  };
+
   _uiApi = {
     setData,
     getData: () => ({ ..._uiState }),
@@ -660,6 +733,10 @@ export function initUI(initialData = {}) {
     openPause,
     closePause,
     togglePause,
+    updateScaleDisplay,
+    setCanvasRef: (canvas) => {
+      _canvas = canvas;
+    },
   };
 
   return _uiApi;

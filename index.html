@@ -235,6 +235,18 @@
       <button id="ctxTarget">Set Target (placeholder)</button>
     </div>
 
+      <!-- SCALE PANEL (bottom right) -->
+      <div id="scalePanel" class="ui-panel scale-panel">
+        <div class="scale-label">Scale</div>
+        <div class="scale-slider-container">
+          <input type="range" id="zoomSlider" class="scale-slider" min="0" max="100" value="50">
+        </div>
+        <div class="scale-value">
+          <span id="scaleValue">10.0</span>
+          <span class="scale-unit">km/px</span>
+        </div>
+      </div>
+
     <!-- Pause Overlay -->
     <div id="pauseOverlay">
       <div id="pauseWindow">
